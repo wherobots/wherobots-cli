@@ -158,6 +158,21 @@ func findOperation(runtimeSpec *spec.RuntimeSpec, method, path string) *spec.Ope
 	return nil
 }
 
+func requiredJobArgument(name, example string) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) == 1 && strings.TrimSpace(args[0]) != "" {
+			return nil
+		}
+
+		message := fmt.Sprintf("missing required argument <%s>", name)
+		if len(args) > 1 {
+			message = fmt.Sprintf("expected one <%s> argument, received %d", name, len(args))
+		}
+		return fmt.Errorf("%s\n\nUsage: %s\nExample: %s %s\nRun '%s --help' for options.",
+			message, cmd.UseLine(), cmd.CommandPath(), example, cmd.CommandPath())
+	}
+}
+
 func (r *jobsRunner) newCreateCommand() *cobra.Command {
 	var (
 		name         string
@@ -178,14 +193,11 @@ func (r *jobsRunner) newCreateCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "create <script>",
 		Short:         "Create a job run",
-		Args:          cobra.ExactArgs(1),
+		Args:          requiredJobArgument("script", "s3://my-bucket/job.py"),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			script := strings.TrimSpace(args[0])
-			if script == "" {
-				return fmt.Errorf("script is required")
-			}
 			if output != outputText && output != outputJSON {
 				return fmt.Errorf("invalid --output %q (expected text|json)", output)
 			}
@@ -689,14 +701,11 @@ func (r *jobsRunner) newLogsCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "logs <run-id>",
 		Short:         "Fetch or stream run logs",
-		Args:          cobra.ExactArgs(1),
+		Args:          requiredJobArgument("run-id", "run-123"),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			runID := strings.TrimSpace(args[0])
-			if runID == "" {
-				return fmt.Errorf("run-id is required")
-			}
 			if interval <= 0 {
 				return fmt.Errorf("--interval must be greater than 0")
 			}
@@ -872,14 +881,11 @@ func (r *jobsRunner) newMetricsCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "metrics <run-id>",
 		Short:         "Display instant metrics for a job run",
-		Args:          cobra.ExactArgs(1),
+		Args:          requiredJobArgument("run-id", "run-123"),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			runID := strings.TrimSpace(args[0])
-			if runID == "" {
-				return fmt.Errorf("run-id is required")
-			}
 			if output != outputText && output != outputJSON {
 				return fmt.Errorf("invalid --output %q (expected text|json)", output)
 			}
