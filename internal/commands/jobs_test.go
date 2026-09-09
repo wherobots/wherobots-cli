@@ -1384,3 +1384,48 @@ func TestJobsRunUploadURLStorageSourceErrorWithoutOverrideOmitsGuidance(t *testi
 		t.Fatalf("did not expect override guidance when no --upload-path was given, got:\n%s", got)
 	}
 }
+
+func TestJobsArgumentErrors(t *testing.T) {
+	t.Parallel()
+	for _, command := range []struct {
+		name     string
+		argument string
+		example  string
+	}{
+		{"create", "script", "s3://my-bucket/job.py"},
+		{"logs", "run-id", "run-123"},
+		{"metrics", "run-id", "run-123"},
+	} {
+		for _, input := range []struct {
+			name    string
+			args    []string
+			message string
+		}{
+			{"missing", nil, "missing required argument <" + command.argument + ">"},
+			{"blank", []string{"  "}, "missing required argument <" + command.argument + ">"},
+			{"extra", []string{"first", "second"}, "expected one <" + command.argument + "> argument, received 2"},
+		} {
+			t.Run(command.name+"/"+input.name, func(t *testing.T) {
+				root := buildJobsTestRoot("http://127.0.0.1:1")
+				root.SetOut(io.Discard)
+				root.SetErr(io.Discard)
+				root.SetArgs(append([]string{"job-runs", command.name}, input.args...))
+				err := root.Execute()
+				if err == nil {
+					t.Fatal("expected argument error")
+				}
+				path := "wherobots job-runs " + command.name
+				for _, want := range []string{
+					input.message,
+					"Usage: " + path + " <" + command.argument + "> [flags]",
+					"Example: " + path + " " + command.example,
+					"Run '" + path + " --help' for options.",
+				} {
+					if !strings.Contains(err.Error(), want) {
+						t.Errorf("error = %q, want %q", err, want)
+					}
+				}
+			})
+		}
+	}
+}
