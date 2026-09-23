@@ -2,17 +2,54 @@ package executor
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
 // maxErrorBodyBytes bounds how much of an error response is kept for the
 // message; storage error bodies are small XML documents.
 const maxErrorBodyBytes = 64 * 1024
+
+// StorageError is a failed transfer against presigned storage. It never holds
+// the response body, which can reveal internal storage locations.
+type StorageError struct {
+	Op         string // "download" or "upload"
+	StatusCode int
+	Code       string // storage error code such as NoSuchKey; may be empty
+}
+
+func (e *StorageError) Error() string {
+	msg := e.Op + " failed with HTTP " + strconv.Itoa(e.StatusCode)
+	if e.Code != "" {
+		msg += " (" + e.Code + ")"
+	}
+	return msg
+}
+
+// storageCodePattern accepts only a short plain word, so nothing else from the body leaks.
+var storageCodePattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
+
+// newStorageError reads at most maxErrorBodyBytes of resp and keeps only the XML <Code>.
+func newStorageError(op string, resp *http.Response) *StorageError {
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes))
+	var parsed struct {
+		Code string `xml:"Code"`
+	}
+	code := ""
+	if xml.Unmarshal(body, &parsed) == nil {
+		if c := strings.TrimSpace(parsed.Code); storageCodePattern.MatchString(c) {
+			code = c
+		}
+	}
+	return &StorageError{Op: op, StatusCode: resp.StatusCode, Code: code}
+}
 
 // ResolveRedirectWithReauth sends an authenticated API request without
 // following redirects and returns the absolute Location of the 3xx answer.
@@ -101,8 +138,7 @@ func StreamFromURL(ctx context.Context, client *http.Client, rawURL string, w io
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes))
-		return 0, fmt.Errorf("download failed with HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return 0, newStorageError("download", resp)
 	}
 
 	written, err := io.Copy(w, resp.Body)

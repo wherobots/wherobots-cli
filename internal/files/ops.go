@@ -469,6 +469,10 @@ func (c *DriveClient) Download(ctx context.Context, remote string, w io.Writer) 
 		return c.mapError(ctx, err, target)
 	}
 	if _, err := executor.StreamFromURL(ctx, c.svc.Transfer, location, w); err != nil {
+		var storageErr *executor.StorageError
+		if errors.As(err, &storageErr) && storageErr.StatusCode == http.StatusNotFound {
+			return &NotFoundError{Path: target}
+		}
 		return fmt.Errorf("downloading %s: %w", target, err)
 	}
 	return nil

@@ -309,6 +309,44 @@ func TestErrorMappingNoSuchFileWhenRootExists(t *testing.T) {
 	}
 }
 
+// downloadVia redirects every API download to a mock storage server answering status with body.
+func downloadVia(t *testing.T, status int, body string) error {
+	t.Helper()
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(status)
+		_, _ = fmt.Fprint(w, body)
+	}))
+	t.Cleanup(storage.Close)
+	api := newMockAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, storage.URL+"/org-42/user-7/obj", http.StatusFound)
+	})
+	return api.drive(t, nil).Download(context.Background(), "reports/missing.csv", &bytes.Buffer{})
+}
+
+func TestDownloadMissingObjectIsNoSuchFile(t *testing.T) {
+	t.Parallel()
+	err := downloadVia(t, http.StatusNotFound,
+		`<Error><Code>NoSuchKey</Code><Message>The specified key does not exist.</Message><Key>org-42/user-7/reports/missing.csv</Key></Error>`)
+	var target *NotFoundError
+	if !errors.As(err, &target) || err.Error() != "no such file or folder: reports/missing.csv" {
+		t.Fatalf("err = %v, want exactly no-such-file", err)
+	}
+}
+
+func TestDownloadStorageDeniedKeepsStatusAndCode(t *testing.T) {
+	t.Parallel()
+	err := downloadVia(t, http.StatusForbidden,
+		`<Error><Code>AccessDenied</Code><Message>Access Denied</Message><Key>org-42/user-7/reports/missing.csv</Key></Error>`)
+	if err == nil || !strings.Contains(err.Error(), "HTTP 403") || !strings.Contains(err.Error(), "AccessDenied") {
+		t.Fatalf("err = %v, want HTTP 403 with AccessDenied", err)
+	}
+	for _, leaked := range []string{"org-42", "Access Denied"} {
+		if strings.Contains(err.Error(), leaked) {
+			t.Fatalf("err = %v, must not include %q from the storage body", err, leaked)
+		}
+	}
+}
+
 func TestDeleteDirRefusesNonEmptyUnlessRecursive(t *testing.T) {
 	t.Parallel()
 	api := newMockAPI(t, func(w http.ResponseWriter, r *http.Request) {
