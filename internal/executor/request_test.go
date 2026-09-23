@@ -542,8 +542,8 @@ func TestBuildRequestKeepsSlashesInMultiSegmentPathValue(t *testing.T) {
 		PathParamOrder: []string{"storage_id", "path"},
 	}
 
-	req, err := BuildRequest(context.Background(), apiKeyCreds("k"), runtimeSpec, op,
-		[]string{"user_files::aws-us-west-2", "reports/q 3#draft/a?b.csv"}, nil, "")
+	req, err := BuildRequestMultiSegment(context.Background(), apiKeyCreds("k"), runtimeSpec, op,
+		[]string{"path"}, []string{"user_files::aws-us-west-2", "reports/q 3#draft/a?b.csv"}, nil, "")
 	if err != nil {
 		t.Fatalf("BuildRequest() error = %v", err)
 	}
@@ -566,8 +566,8 @@ func TestBuildRequestKeepsTrailingSlashOnFolderPathValue(t *testing.T) {
 		PathParamOrder: []string{"storage_id", "path"},
 	}
 
-	req, err := BuildRequest(context.Background(), apiKeyCreds("k"), runtimeSpec, op,
-		[]string{"s", "a/b c/"}, nil, "")
+	req, err := BuildRequestMultiSegment(context.Background(), apiKeyCreds("k"), runtimeSpec, op,
+		[]string{"path"}, []string{"s", "a/b c/"}, nil, "")
 	if err != nil {
 		t.Fatalf("BuildRequest() error = %v", err)
 	}
@@ -576,7 +576,7 @@ func TestBuildRequestKeepsTrailingSlashOnFolderPathValue(t *testing.T) {
 	}
 }
 
-func TestBuildRequestSingleSegmentPathValueUnchanged(t *testing.T) {
+func TestBuildRequestSingleSegmentPathValueEscapesSlash(t *testing.T) {
 	t.Parallel()
 
 	runtimeSpec := &spec.RuntimeSpec{BaseURL: "https://api.example.com"}
@@ -587,11 +587,31 @@ func TestBuildRequestSingleSegmentPathValueUnchanged(t *testing.T) {
 	}
 
 	req, err := BuildRequest(context.Background(), apiKeyCreds("k"), runtimeSpec, op,
-		[]string{"run 1#x"}, nil, "")
+		[]string{"run 1#x/y"}, nil, "")
 	if err != nil {
 		t.Fatalf("BuildRequest() error = %v", err)
 	}
-	if got, want := req.URL.String(), "https://api.example.com/runs/run%201%23x"; got != want {
+	if got, want := req.URL.String(), "https://api.example.com/runs/run%201%23x%2Fy"; got != want {
+		t.Fatalf("url = %s, want %s", got, want)
+	}
+}
+
+func TestBuildRequestMultiSegmentOnlyKeepsSlashesInNamedParams(t *testing.T) {
+	t.Parallel()
+
+	runtimeSpec := &spec.RuntimeSpec{BaseURL: "https://api.example.com"}
+	op := &spec.Operation{
+		Method:         "GET",
+		Path:           "/storage/{storage_id}/files/{path}",
+		PathParamOrder: []string{"storage_id", "path"},
+	}
+
+	req, err := BuildRequestMultiSegment(context.Background(), apiKeyCreds("k"), runtimeSpec, op,
+		[]string{"path"}, []string{"a/b", "c/d"}, nil, "")
+	if err != nil {
+		t.Fatalf("BuildRequestMultiSegment() error = %v", err)
+	}
+	if got, want := req.URL.String(), "https://api.example.com/storage/a%2Fb/files/c/d"; got != want {
 		t.Fatalf("url = %s, want %s", got, want)
 	}
 }

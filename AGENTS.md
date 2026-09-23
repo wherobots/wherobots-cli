@@ -43,7 +43,7 @@ The CLI builds its command tree at startup from a live OpenAPI spec. `internal/s
 
 ### Request Execution Pipeline
 
-`internal/executor/request.go` builds authenticated HTTP requests via the `Credentials` interface (implemented by `internal/auth.Resolver`: `x-api-key` header for API keys, `Authorization: Bearer` for OAuth sessions, with proactive refresh and a one-shot 401 refresh-replay in `DoWithReauth`). `dryrun.go` outputs the equivalent curl command when `--dry-run` is used. `upload.go` handles S3 presigned-URL uploads with a 500MB limit. `download.go` resolves a download redirect without following it and fetches the presigned URL with no auth headers. Multi-segment path parameters keep `/` (each segment is escaped separately).
+`internal/executor/request.go` builds authenticated HTTP requests via the `Credentials` interface (implemented by `internal/auth.Resolver`: `x-api-key` header for API keys, `Authorization: Bearer` for OAuth sessions, with proactive refresh and a one-shot 401 refresh-replay in `DoWithReauth`). `dryrun.go` outputs the equivalent curl command when `--dry-run` is used. `upload.go` handles S3 presigned-URL uploads with a 500MB limit. `download.go` resolves a download redirect without following it and fetches the presigned URL with no auth headers. `BuildRequestMultiSegment` keeps `/` in named greedy path params (the Files `{path}`), escaping each segment; `BuildRequest` escapes `/` as `%2F`.
 
 ### Authentication
 

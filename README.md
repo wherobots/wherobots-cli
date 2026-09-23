@@ -230,6 +230,7 @@ Notes:
 
 - `upload` accepts files up to 500 MB.
 - `mv` renames within a folder; moving a file to another folder is not supported.
+- `rmdir` without `--recursive` checks that the folder is empty, then deletes it in a second request; anything added to the folder in between is deleted with it.
 - Downloads go straight to storage through a presigned link; your API key or sign-in token is never sent there. A failed download leaves no partial file.
 - Uploads and downloads have no overall time limit; press Ctrl-C to stop a stalled transfer.
 - "Files is not enabled for my-files in region X" means the Files area is not available to you in that region; try another `--region`.

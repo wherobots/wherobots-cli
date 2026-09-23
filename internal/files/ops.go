@@ -208,6 +208,9 @@ func RenameTarget(src, dst string) (string, error) {
 	if source.isRoot() {
 		return "", fmt.Errorf("cannot rename the drive root")
 	}
+	if err := source.requireFile(src); err != nil {
+		return "", err
+	}
 	if !strings.Contains(dst, "/") {
 		if err := validateNewName(dst); err != nil {
 			return "", err
@@ -243,7 +246,7 @@ func (c *DriveClient) build(ctx context.Context, op *spec.Operation, remotePath 
 			return nil, fmt.Errorf("unexpected path parameter %q in %s %s", name, op.Method, op.Path)
 		}
 	}
-	return executor.BuildRequest(ctx, c.svc.Creds, c.svc.Runtime, op, args, query, "")
+	return executor.BuildRequestMultiSegment(ctx, c.svc.Creds, c.svc.Runtime, op, []string{"path"}, args, query, "")
 }
 
 // send runs one API request, or prints it as curl in dry-run mode and
@@ -346,7 +349,8 @@ func (c *DriveClient) List(ctx context.Context, remote string) ([]Entry, error) 
 }
 
 // Mkdir creates each level of a nested folder in order, one request per
-// level, so no level is created implicitly. A level that exists is kept.
+// level, so no level is created implicitly. A folder that exists is kept;
+// a file with that name is an error.
 func (c *DriveClient) Mkdir(ctx context.Context, remote string) error {
 	p, err := parseRemotePath(remote)
 	if err != nil {
@@ -360,10 +364,29 @@ func (c *DriveClient) Mkdir(ctx context.Context, remote string) error {
 		_, err := c.send(ctx, c.svc.Ops.CreateDirectory, level, nil)
 		var httpErr *executor.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusConflict {
-			continue // already exists, like mkdir -p
+			if err := c.requireNotFile(ctx, p.segments[:i+1]); err != nil {
+				return err
+			}
+			continue // already a folder, like mkdir -p
 		}
 		if err != nil {
 			return c.mapError(ctx, err, level)
+		}
+	}
+	return nil
+}
+
+// requireNotFile runs after a 409 on creating the folder at segments. It
+// lists the parent and fails when the name is listed as a file.
+func (c *DriveClient) requireNotFile(ctx context.Context, segments []string) error {
+	name := segments[len(segments)-1]
+	entries, err := c.List(ctx, strings.Join(segments[:len(segments)-1], "/")+"/")
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if strings.Trim(entry.Name, "/") == name && !entry.IsFolder() {
+			return fmt.Errorf("cannot create folder %s: a file with that name already exists", strings.Join(segments, "/")+"/")
 		}
 	}
 	return nil
@@ -446,13 +469,13 @@ func (c *DriveClient) Rename(ctx context.Context, remote, newName string) error 
 	if p.isRoot() {
 		return fmt.Errorf("cannot rename the drive root")
 	}
+	if err := p.requireFile(remote); err != nil {
+		return err
+	}
 	if err := validateNewName(newName); err != nil {
 		return err
 	}
 	target := p.filePath()
-	if p.folder {
-		target = p.folderPath()
-	}
 	_, err = c.send(ctx, c.svc.Ops.RenameFile, target, []executor.QueryPair{{Key: "new_name", Value: newName}})
 	if err != nil {
 		return c.mapError(ctx, err, target)
@@ -490,7 +513,8 @@ func (e *FolderNotEmptyError) Error() string {
 
 // DeleteDir removes a folder. Unless recursive is set, it first lists the
 // folder and refuses when anything is in it, because the server deletes
-// the folder together with its contents.
+// the folder together with its contents. The check is not atomic: content
+// added between the listing and the delete is deleted too.
 func (c *DriveClient) DeleteDir(ctx context.Context, remote string, recursive bool) error {
 	p, err := parseRemotePath(remote)
 	if err != nil {
@@ -506,7 +530,11 @@ func (c *DriveClient) DeleteDir(ctx context.Context, remote string, recursive bo
 		if err != nil {
 			return c.mapError(ctx, err, folder)
 		}
-		if !c.dryRun() {
+		if c.dryRun() {
+			if _, err := fmt.Fprintln(c.svc.DryRun, "# the DELETE below is sent only if the listing above shows the folder is empty"); err != nil {
+				return err
+			}
+		} else {
 			// A further page means more entries than the marker, so it is not empty.
 			if strings.TrimSpace(gjson.GetBytes(body, "next_page").String()) != "" {
 				return &FolderNotEmptyError{Path: folder}

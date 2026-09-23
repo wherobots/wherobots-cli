@@ -155,6 +155,10 @@ func TestListPaginatesWithExplicitLimit(t *testing.T) {
 func TestMkdirCreatesEachLevelInOrder(t *testing.T) {
 	t.Parallel()
 	api := newMockAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			_, _ = fmt.Fprint(w, `{"items":[{"name":"a","path":"a/","type":"FOLDER"}],"next_page":null}`)
+			return
+		}
 		if strings.HasSuffix(r.URL.Path, "/directories/a/") {
 			w.WriteHeader(http.StatusConflict) // already exists
 			return
@@ -165,18 +169,43 @@ func TestMkdirCreatesEachLevelInOrder(t *testing.T) {
 	if err := api.drive(t, nil).Mkdir(context.Background(), "a/b c/d"); err != nil {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
-	want := []string{
-		prefix + "/directories/a/",
-		prefix + "/directories/a/b%20c/",
-		prefix + "/directories/a/b%20c/d/",
+	want := []recorded{
+		{Method: http.MethodPut, Path: prefix + "/directories/a/"},
+		{Method: http.MethodGet, Path: prefix + "/directories/"},
+		{Method: http.MethodPut, Path: prefix + "/directories/a/b%20c/"},
+		{Method: http.MethodPut, Path: prefix + "/directories/a/b%20c/d/"},
 	}
 	if len(api.requests) != len(want) {
 		t.Fatalf("requests = %+v", api.requests)
 	}
 	for i, req := range api.requests {
-		if req.Method != http.MethodPut || req.Path != want[i] {
-			t.Fatalf("request %d = %s %s, want PUT %s", i, req.Method, req.Path, want[i])
+		if req.Method != want[i].Method || req.Path != want[i].Path {
+			t.Fatalf("request %d = %s %s, want %s %s", i, req.Method, req.Path, want[i].Method, want[i].Path)
 		}
+	}
+}
+
+func TestMkdirRefusesWhenAFileHasTheName(t *testing.T) {
+	t.Parallel()
+	api := newMockAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			_, _ = fmt.Fprint(w, `{"items":[{"name":"b","path":"a/b","type":"FILE","size":1}],"next_page":null}`)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/directories/a/b/") {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+	})
+
+	err := api.drive(t, nil).Mkdir(context.Background(), "a/b/c")
+	if err == nil || !strings.Contains(err.Error(), "a file with that name already exists") {
+		t.Fatalf("err = %v, want the file-exists refusal", err)
+	}
+	last := api.requests[len(api.requests)-1]
+	if last.Method != http.MethodGet || last.Path != prefix+"/directories/a/" {
+		t.Fatalf("last request = %+v, want the listing of a/ and no PUT for a/b/c/", last)
 	}
 }
 
@@ -331,6 +360,7 @@ func TestRenameTarget(t *testing.T) {
 		{"reports/q3.csv", "archive/final.csv", "", true},
 		{"reports/q3.csv", "..", "", true},
 		{"reports/q3.csv", "reports/", "", true},
+		{"reports/", "archive", "", true},
 	}
 	for _, tc := range cases {
 		got, err := RenameTarget(tc.src, tc.dst)
@@ -340,6 +370,20 @@ func TestRenameTarget(t *testing.T) {
 	}
 	if _, err := RenameTarget("a/x", "b/y"); err == nil || !strings.Contains(err.Error(), "moves between folders are not supported") {
 		t.Fatalf("err = %v, want the between-folders message", err)
+	}
+}
+
+func TestRenameRefusesAFolderSource(t *testing.T) {
+	t.Parallel()
+	api := newMockAPI(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	err := api.drive(t, nil).Rename(context.Background(), "reports/", "archive")
+	if err == nil || !strings.Contains(err.Error(), "names a folder") {
+		t.Fatalf("err = %v, want a folder refusal", err)
+	}
+	if len(api.requests) != 0 {
+		t.Fatalf("requests = %+v, want none", api.requests)
 	}
 }
 
@@ -365,7 +409,7 @@ func TestDryRunSendsNothing(t *testing.T) {
 		t.Fatalf("dry-run sent %d requests", len(api.requests))
 	}
 	got := out.String()
-	for _, want := range []string{"-X PUT", "/directories/a/b/", "-X DELETE", "/files/a/x.csv"} {
+	for _, want := range []string{"-X PUT", "/directories/a/b/", "-X DELETE", "sent only if the listing above shows the folder is empty", "/files/a/x.csv"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("dry-run output is missing %q:\n%s", want, got)
 		}

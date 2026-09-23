@@ -227,6 +227,8 @@ type Credentials interface {
 	ForceRefresh(ctx context.Context) (bool, error)
 }
 
+// BuildRequest builds an authenticated request. Every path parameter is
+// escaped as one segment, so a "/" inside a value is sent as %2F.
 func BuildRequest(
 	ctx context.Context,
 	creds Credentials,
@@ -235,6 +237,38 @@ func BuildRequest(
 	pathArgs []string,
 	queryPairs []QueryPair,
 	jsonBody string,
+) (*http.Request, error) {
+	return buildRequest(ctx, creds, runtimeSpec, op, pathArgs, queryPairs, jsonBody, nil)
+}
+
+// BuildRequestMultiSegment is BuildRequest for routes whose named path
+// parameters are greedy (e.g. FastAPI {path:path}): those keep "/" as-is.
+func BuildRequestMultiSegment(
+	ctx context.Context,
+	creds Credentials,
+	runtimeSpec *spec.RuntimeSpec,
+	op *spec.Operation,
+	multiSegment []string,
+	pathArgs []string,
+	queryPairs []QueryPair,
+	jsonBody string,
+) (*http.Request, error) {
+	keep := make(map[string]bool, len(multiSegment))
+	for _, name := range multiSegment {
+		keep[name] = true
+	}
+	return buildRequest(ctx, creds, runtimeSpec, op, pathArgs, queryPairs, jsonBody, keep)
+}
+
+func buildRequest(
+	ctx context.Context,
+	creds Credentials,
+	runtimeSpec *spec.RuntimeSpec,
+	op *spec.Operation,
+	pathArgs []string,
+	queryPairs []QueryPair,
+	jsonBody string,
+	multiSegment map[string]bool,
 ) (*http.Request, error) {
 	if runtimeSpec == nil || op == nil {
 		return nil, fmt.Errorf("missing runtime operation context")
@@ -253,7 +287,11 @@ func BuildRequest(
 
 	resolvedPath := op.Path
 	for idx, paramName := range op.PathParamOrder {
-		resolvedPath = strings.ReplaceAll(resolvedPath, "{"+paramName+"}", escapePathValue(pathArgs[idx]))
+		escaped := url.PathEscape(pathArgs[idx])
+		if multiSegment[paramName] {
+			escaped = escapePathValue(pathArgs[idx])
+		}
+		resolvedPath = strings.ReplaceAll(resolvedPath, "{"+paramName+"}", escaped)
 	}
 	if strings.Contains(resolvedPath, "{") {
 		return nil, fmt.Errorf("unresolved path parameters in %q", resolvedPath)

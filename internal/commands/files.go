@@ -455,7 +455,7 @@ func (r *filesRunner) newRmdirCommand(open openDrive) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "rmdir <remote-folder>",
 		Short:         "Delete a folder",
-		Long:          "Delete a folder. A folder that is not empty is refused unless --recursive is given, which deletes the folder and everything in it.",
+		Long:          "Delete a folder. Without --recursive, it first checks that the folder is empty and refuses if not; the check and the delete are separate requests, so anything added in between is deleted too. --recursive deletes the folder and everything in it.",
 		Args:          filesArgs(1, 1, "reports/2026/q3"),
 		SilenceUsage:  true,
 		SilenceErrors: true,
