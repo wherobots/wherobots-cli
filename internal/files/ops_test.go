@@ -152,6 +152,40 @@ func TestListPaginatesWithExplicitLimit(t *testing.T) {
 	}
 }
 
+func TestListDropsFolderMarker(t *testing.T) {
+	t.Parallel()
+	api := newMockAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, `{"items":[{"name":"","path":"empty/","type":"FOLDER"}],"next_page":null}`)
+	})
+
+	entries, err := api.drive(t, nil).List(context.Background(), "empty/")
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("entries = %+v, want none for a folder holding only its marker", entries)
+	}
+}
+
+func TestDeleteDirAllowsFolderWithOnlyMarker(t *testing.T) {
+	t.Parallel()
+	api := newMockAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			_, _ = fmt.Fprint(w, `{"items":[{"name":"","type":"FOLDER"}],"next_page":null}`)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	if err := api.drive(t, nil).DeleteDir(context.Background(), "empty", false); err != nil {
+		t.Fatalf("DeleteDir() error = %v", err)
+	}
+	last := api.requests[len(api.requests)-1]
+	if last.Method != http.MethodDelete || last.Path != prefix+"/directories/empty/" {
+		t.Fatalf("last request = %+v", last)
+	}
+}
+
 func TestMkdirCreatesEachLevelInOrder(t *testing.T) {
 	t.Parallel()
 	api := newMockAPI(t, func(w http.ResponseWriter, r *http.Request) {

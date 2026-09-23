@@ -294,11 +294,17 @@ func (c *DriveClient) rootMissing(ctx context.Context) bool {
 	return errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound
 }
 
+// parseEntries drops the folder's own marker (an item with an empty name),
+// so a listing never shows it as a nameless folder.
 func parseEntries(body []byte) []Entry {
 	var entries []Entry
 	gjson.GetBytes(body, "items").ForEach(func(_, item gjson.Result) bool {
+		name := item.Get("name").String()
+		if strings.Trim(name, "/") == "" {
+			return true
+		}
 		entries = append(entries, Entry{
-			Name:         item.Get("name").String(),
+			Name:         name,
 			Path:         item.Get("path").String(),
 			Type:         item.Get("type").String(),
 			Size:         item.Get("size").Int(),
@@ -547,10 +553,8 @@ func (c *DriveClient) DeleteDir(ctx context.Context, remote string, recursive bo
 			if strings.TrimSpace(gjson.GetBytes(body, "next_page").String()) != "" {
 				return &FolderNotEmptyError{Path: folder}
 			}
-			for _, entry := range parseEntries(body) {
-				if strings.Trim(entry.Name, "/") != "" {
-					return &FolderNotEmptyError{Path: folder}
-				}
+			if len(parseEntries(body)) > 0 {
+				return &FolderNotEmptyError{Path: folder}
 			}
 		}
 	}
