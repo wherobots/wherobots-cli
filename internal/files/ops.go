@@ -376,18 +376,26 @@ func (c *DriveClient) Mkdir(ctx context.Context, remote string) error {
 	return nil
 }
 
-// requireNotFile runs after a 409 on creating the folder at segments. It
-// lists the parent and fails when the name is listed as a file.
+// requireNotFile runs after a 409 on creating the folder at segments. It lists
+// the parent and fails only when the name is a file and not also a folder.
 func (c *DriveClient) requireNotFile(ctx context.Context, segments []string) error {
 	name := segments[len(segments)-1]
 	entries, err := c.List(ctx, strings.Join(segments[:len(segments)-1], "/")+"/")
 	if err != nil {
 		return err
 	}
+	fileMatch := false
 	for _, entry := range entries {
-		if strings.Trim(entry.Name, "/") == name && !entry.IsFolder() {
-			return fmt.Errorf("cannot create folder %s: a file with that name already exists", strings.Join(segments, "/")+"/")
+		if strings.Trim(entry.Name, "/") != name {
+			continue
 		}
+		if entry.IsFolder() {
+			return nil // object a/b and prefix a/b/ can coexist; the folder is there
+		}
+		fileMatch = true
+	}
+	if fileMatch {
+		return fmt.Errorf("cannot create folder %s: a file with that name already exists", strings.Join(segments, "/")+"/")
 	}
 	return nil
 }

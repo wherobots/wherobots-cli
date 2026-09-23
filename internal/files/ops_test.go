@@ -209,6 +209,29 @@ func TestMkdirRefusesWhenAFileHasTheName(t *testing.T) {
 	}
 }
 
+func TestMkdirContinuesWhenAFolderAndAFileShareTheName(t *testing.T) {
+	t.Parallel()
+	api := newMockAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			_, _ = fmt.Fprint(w, `{"items":[{"name":"b","path":"a/b","type":"FILE","size":1},{"name":"b/","path":"a/b/","type":"FOLDER"}],"next_page":null}`)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/directories/a/b/") {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+	})
+
+	if err := api.drive(t, nil).Mkdir(context.Background(), "a/b/c"); err != nil {
+		t.Fatalf("err = %v, want nil: the folder a/b/ exists beside the file a/b", err)
+	}
+	last := api.requests[len(api.requests)-1]
+	if last.Method != http.MethodPut || last.Path != prefix+"/directories/a/b/c/" {
+		t.Fatalf("last request = %+v, want the PUT for a/b/c/", last)
+	}
+}
+
 func TestErrorMappingNotSignedIn(t *testing.T) {
 	t.Parallel()
 	api := newMockAPI(t, func(w http.ResponseWriter, _ *http.Request) {
