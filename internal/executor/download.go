@@ -77,7 +77,7 @@ func redirectLocation(client *http.Client, req *http.Request) (string, error) {
 }
 
 // StreamFromURL fetches rawURL with a fresh GET that carries no auth or
-// client headers (the URL is presigned) and copies the body to w.
+// client headers (the URL is presigned) and copies the body to w verbatim.
 func StreamFromURL(ctx context.Context, client *http.Client, rawURL string, w io.Writer) (int64, error) {
 	if client == nil {
 		return 0, fmt.Errorf("http client is required")
@@ -91,6 +91,9 @@ func StreamFromURL(ctx context.Context, client *http.Client, rawURL string, w io
 	if err != nil {
 		return 0, fmt.Errorf("build download request: %w", err)
 	}
+	// An explicit Accept-Encoding stops Go's transport from gunzipping a
+	// Content-Encoding: gzip object, so the stored bytes land unchanged.
+	req.Header.Set("Accept-Encoding", "identity")
 	resp, err := client.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("download request failed: %w", err)

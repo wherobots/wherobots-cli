@@ -2,6 +2,7 @@ package executor
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"net/http"
@@ -171,6 +172,33 @@ func TestResolveRedirectRejectsNonRedirectSuccess(t *testing.T) {
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, api.URL+"/f", nil)
 	if _, err := ResolveRedirectWithReauth(api.Client(), req, apiKeyCreds("k")); err == nil {
 		t.Fatalf("expected an error for a 200 without redirect")
+	}
+}
+
+func TestStreamFromURLKeepsGzipBytes(t *testing.T) {
+	t.Parallel()
+	var zipped bytes.Buffer
+	zw := gzip.NewWriter(&zipped)
+	_, _ = zw.Write([]byte("hello, compressed"))
+	_ = zw.Close()
+
+	acceptEncoding := make(chan string, 1)
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		acceptEncoding <- r.Header.Get("Accept-Encoding")
+		w.Header().Set("Content-Encoding", "gzip")
+		_, _ = w.Write(zipped.Bytes())
+	}))
+	defer storage.Close()
+
+	var out bytes.Buffer
+	if _, err := StreamFromURL(context.Background(), &http.Client{}, storage.URL+"/obj.gz", &out); err != nil {
+		t.Fatalf("StreamFromURL() error = %v", err)
+	}
+	if !bytes.Equal(out.Bytes(), zipped.Bytes()) {
+		t.Fatalf("got %d bytes, want the %d stored gzip bytes unchanged", out.Len(), zipped.Len())
+	}
+	if got := <-acceptEncoding; got != "identity" {
+		t.Fatalf("Accept-Encoding = %q, want identity", got)
 	}
 }
 

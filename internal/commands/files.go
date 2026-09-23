@@ -6,9 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -478,8 +481,9 @@ func (r *filesRunner) report(cmd *cobra.Command, format string, args ...any) err
 
 // writeFileAtomically fills a temporary file beside dest and renames it into
 // place only on success, so a failed transfer leaves no half-written file.
+// A replaced file keeps its permissions; a new one gets 0666 less the umask.
 func writeFileAtomically(dest string, fill func(io.Writer) error) (err error) {
-	tmp, err := os.CreateTemp(filepath.Dir(dest), "."+filepath.Base(dest)+".partial-*")
+	tmp, err := createPartialFile(dest)
 	if err != nil {
 		return fmt.Errorf("create temporary file: %w", err)
 	}
@@ -495,11 +499,28 @@ func writeFileAtomically(dest string, fill func(io.Writer) error) (err error) {
 	if err = tmp.Close(); err != nil {
 		return fmt.Errorf("write %s: %w", dest, err)
 	}
-	if err = os.Chmod(tmp.Name(), 0o644); err != nil {
-		return fmt.Errorf("set permissions on %s: %w", dest, err)
+	if info, statErr := os.Stat(dest); statErr == nil && info.Mode().IsRegular() {
+		if err = os.Chmod(tmp.Name(), info.Mode().Perm()); err != nil {
+			return fmt.Errorf("set permissions on %s: %w", dest, err)
+		}
 	}
 	if err = os.Rename(tmp.Name(), dest); err != nil {
 		return fmt.Errorf("move download into place at %s: %w", dest, err)
 	}
 	return nil
+}
+
+// createPartialFile opens a new, uniquely named file beside dest. It asks for
+// 0666 so the process umask decides the mode, as for any file the user creates.
+func createPartialFile(dest string) (*os.File, error) {
+	prefix := filepath.Join(filepath.Dir(dest), "."+filepath.Base(dest)+".partial-")
+	for range 100 {
+		name := prefix + strconv.FormatUint(uint64(rand.Uint32()), 10)
+		f, err := os.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
+		if errors.Is(err, fs.ErrExist) {
+			continue
+		}
+		return f, err
+	}
+	return nil, fmt.Errorf("could not pick an unused temporary name beside %s", dest)
 }

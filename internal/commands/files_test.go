@@ -2,12 +2,14 @@ package commands
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -88,12 +90,17 @@ func newFilesMock(t *testing.T, handle func(w http.ResponseWriter, r *http.Reque
 
 func (m *filesMock) run(t *testing.T, args ...string) (string, error) {
 	t.Helper()
+	return m.runContext(t, context.Background(), args...)
+}
+
+func (m *filesMock) runContext(t *testing.T, ctx context.Context, args ...string) (string, error) {
+	t.Helper()
 	root := buildFilesTestRoot(m.server.URL)
 	var out bytes.Buffer
 	root.SetOut(&out)
 	root.SetErr(&bytes.Buffer{})
 	root.SetArgs(args)
-	err := root.Execute()
+	err := root.ExecuteContext(ctx)
 	return out.String(), err
 }
 
@@ -259,6 +266,78 @@ func TestFilesDownloadFailureLeavesNoFile(t *testing.T) {
 	entries, _ := os.ReadDir(filepath.Dir(dest))
 	if len(entries) != 0 {
 		t.Fatalf("files left behind after a failed download: %v", entries)
+	}
+}
+
+func TestFilesDownloadPermissions(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits")
+	}
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("new"))
+	}))
+	defer storage.Close()
+	m := newFilesMock(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, storage.URL+"/get", http.StatusTemporaryRedirect)
+	})
+	dir := t.TempDir()
+
+	existing := filepath.Join(dir, "secret.csv")
+	if err := os.WriteFile(existing, []byte("old"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.run(t, "files", "my-files", "download", "secret.csv", existing); err != nil {
+		t.Fatalf("download error = %v", err)
+	}
+	if info, err := os.Stat(existing); err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("replaced file mode = %v, %v; want 0600 kept", info.Mode().Perm(), err)
+	}
+
+	// A file the user creates with 0666 shows what the umask allows.
+	probe := filepath.Join(dir, "probe")
+	f, err := os.OpenFile(probe, os.O_CREATE|os.O_WRONLY, 0o666)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
+	probeInfo, _ := os.Stat(probe)
+
+	fresh := filepath.Join(dir, "fresh.csv")
+	if _, err := m.run(t, "files", "my-files", "download", "fresh.csv", fresh); err != nil {
+		t.Fatalf("download error = %v", err)
+	}
+	if info, err := os.Stat(fresh); err != nil || info.Mode().Perm() != probeInfo.Mode().Perm() {
+		t.Fatalf("new file mode = %v, %v; want umask-derived %v", info.Mode().Perm(), err, probeInfo.Mode().Perm())
+	}
+}
+
+func TestFilesDownloadCancelledLeavesNoFile(t *testing.T) {
+	t.Parallel()
+	started := make(chan struct{})
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("first bytes"))
+		w.(http.Flusher).Flush()
+		close(started)
+		<-r.Context().Done()
+	}))
+	defer storage.Close()
+	m := newFilesMock(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, storage.URL+"/get", http.StatusTemporaryRedirect)
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-started
+		cancel()
+	}()
+	dest := filepath.Join(t.TempDir(), "slow.csv")
+	if _, err := m.runContext(t, ctx, "files", "my-files", "download", "slow.csv", dest); err == nil {
+		t.Fatalf("expected an error from a cancelled download")
+	}
+	entries, _ := os.ReadDir(filepath.Dir(dest))
+	if len(entries) != 0 {
+		t.Fatalf("files left behind after a cancelled download: %v", entries)
 	}
 }
 
