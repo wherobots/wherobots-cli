@@ -300,10 +300,10 @@ func (r *filesRunner) newMkdirCommand(open openDrive) *cobra.Command {
 
 func (r *filesRunner) newUploadCommand(open openDrive) *cobra.Command {
 	return &cobra.Command{
-		Use:           "upload <remote-path> <local-file>",
+		Use:           "upload <local-file> <remote-path>",
 		Short:         "Upload one local file",
 		Long:          "Upload one local file (up to 500 MB). When <remote-path> ends in \"/\", the local file's name is added to it.",
-		Args:          filesArgs(2, 2, "reports/q3.csv ./q3.csv"),
+		Args:          filesArgs(2, 2, "./q3.csv reports/q3.csv"),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -311,11 +311,12 @@ func (r *filesRunner) newUploadCommand(open openDrive) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			target, err := drive.Upload(cmd.Context(), args[0], args[1])
+			local, remote := args[0], args[1]
+			target, err := drive.Upload(cmd.Context(), remote, local)
 			if err != nil {
 				return err
 			}
-			return r.report(cmd, "Uploaded %s to %s\n", args[1], target)
+			return r.report(cmd, "Uploaded %s to %s\n", local, target)
 		},
 	}
 }

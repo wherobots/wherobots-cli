@@ -206,8 +206,8 @@ Work with one file or folder at a time in your personal Files area (`my-files`).
 wherobots files my-files ls                              # list the root
 wherobots files my-files ls reports/2026 --output json   # list a folder as JSON
 wherobots files my-files mkdir reports/2026/q3           # creates each missing level in turn
-wherobots files my-files upload reports/q3.csv ./q3.csv  # <remote path> <local file>
-wherobots files my-files upload reports/ ./q3.csv        # keeps the local name: reports/q3.csv
+wherobots files my-files upload ./q3.csv reports/q3.csv  # <local file> <remote path>
+wherobots files my-files upload ./q3.csv reports/        # keeps the local name: reports/q3.csv
 wherobots files my-files download reports/q3.csv         # saves ./q3.csv
 wherobots files my-files download reports/q3.csv ./out/  # saves ./out/q3.csv
 wherobots files my-files cat reports/q3.csv              # prints to stdout

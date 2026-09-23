@@ -207,11 +207,14 @@ func TestFilesUploadDownloadAndCat(t *testing.T) {
 	if err := os.WriteFile(local, []byte("a,b\n1,2\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.run(t, "files", "my-files", "upload", "reports/", local); err != nil {
+	if _, err := m.run(t, "files", "my-files", "upload", local, "reports/"); err != nil {
 		t.Fatalf("upload error = %v", err)
 	}
 	if string(stored) != "a,b\n1,2\n" {
 		t.Fatalf("stored = %q", stored)
+	}
+	if reqs := m.storageRequests(); len(reqs) != 1 || reqs[0].Path != westPrefix+"/file-upload-url/reports/q3.csv" {
+		t.Fatalf("upload requests = %+v, want one to reports/q3.csv", reqs)
 	}
 
 	outDir := filepath.Join(dir, "out")
@@ -364,7 +367,7 @@ func TestFilesArgumentErrors(t *testing.T) {
 	t.Parallel()
 	m := newFilesMock(t, func(http.ResponseWriter, *http.Request) {})
 	cases := [][]string{
-		{"files", "my-files", "upload", "reports/q3.csv"},
+		{"files", "my-files", "upload", "./q3.csv"},
 		{"files", "my-files", "mkdir"},
 		{"files", "my-files", "rm", "a", "b"},
 		{"files", "my-files", "download"},
