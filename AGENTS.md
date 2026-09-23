@@ -4,8 +4,9 @@ Guidance for AI coding agents (Claude Code, Copilot, Codex) working in this repo
 
 ## What This Is
 
-`wherobots` CLI — a Go command-line tool for the Wherobots Cloud API. It has two command groups:
+`wherobots` CLI — a Go command-line tool for the Wherobots Cloud API. It has three command groups:
 - **`job-runs`** — curated commands for submitting Spark jobs, streaming logs, listing runs, and viewing metrics
+- **`files`** — curated commands for Wherobots Files (`files my-files ls|mkdir|upload|download|cat|mv|rm|rmdir`)
 - **Dynamic API commands** — generated at runtime from the Wherobots OpenAPI spec, so every API endpoint is available as a CLI command
 
 ## Build & Development Commands
@@ -36,9 +37,13 @@ The CLI builds its command tree at startup from a live OpenAPI spec. `internal/s
 
 `internal/commands/jobs.go` defines hand-written commands (`create`, `logs`, `list`, `running`, `failed`, `completed`, `metrics`) that layer workflow logic on top of the API: auto-uploading local scripts to S3 via presigned URLs, log streaming with polling, status watching, and formatted output.
 
+### Curated `files` Commands
+
+`internal/commands/files.go` builds the `files` → `my-files` → verb tree over the `/storage/{storage_id}/...` file routes (group skipped if the spec lacks them). `internal/files` holds the logic: `drive.go` maps a drive to its storage id (`my-files` → `user_files::<region>`; a future shared drive adds a kind there), and `ops.go` implements every operation once against a drive — path checks, `limit`+cursor listing, level-by-level `mkdir`, presigned upload/download, and mapping of 401/404 to "not signed in", "Files is not enabled for <drive> in region <r>" and "no such file or folder". Region is `--region`, else the org's `defaultRegion`.
+
 ### Request Execution Pipeline
 
-`internal/executor/request.go` builds authenticated HTTP requests via the `Credentials` interface (implemented by `internal/auth.Resolver`: `x-api-key` header for API keys, `Authorization: Bearer` for OAuth sessions, with proactive refresh and a one-shot 401 refresh-replay in `DoWithReauth`). `dryrun.go` outputs the equivalent curl command when `--dry-run` is used. `upload.go` handles S3 presigned-URL uploads with a 500MB limit.
+`internal/executor/request.go` builds authenticated HTTP requests via the `Credentials` interface (implemented by `internal/auth.Resolver`: `x-api-key` header for API keys, `Authorization: Bearer` for OAuth sessions, with proactive refresh and a one-shot 401 refresh-replay in `DoWithReauth`). `dryrun.go` outputs the equivalent curl command when `--dry-run` is used. `upload.go` handles S3 presigned-URL uploads with a 500MB limit. `download.go` resolves a download redirect without following it and fetches the presigned URL with no auth headers. Multi-segment path parameters keep `/` (each segment is escaped separately).
 
 ### Authentication
 
@@ -48,9 +53,10 @@ The CLI builds its command tree at startup from a live OpenAPI spec. `internal/s
 
 | Package | Role |
 |---------|------|
-| `internal/commands` | Cobra command builders — both dynamic (builder.go) and curated (jobs.go) |
+| `internal/commands` | Cobra command builders — both dynamic (builder.go) and curated (jobs.go, files.go) |
+| `internal/files` | Wherobots Files drives and file operations used by `files` commands |
 | `internal/spec` | OpenAPI spec fetching, caching, and parsing |
-| `internal/executor` | HTTP request construction, execution, dry-run, file upload |
+| `internal/executor` | HTTP request construction, execution, dry-run, file upload and download |
 | `internal/config` | Env-var-based configuration loading |
 | `internal/hints` | Schema-aware error messages for invalid arguments |
 | `internal/version` | Background update checking via `gh release view` |

@@ -531,3 +531,67 @@ func TestDoWithReauthPassesThroughNon401Errors(t *testing.T) {
 		t.Fatalf("refreshCalls = %d, want 0", creds.refreshCalls)
 	}
 }
+
+func TestBuildRequestKeepsSlashesInMultiSegmentPathValue(t *testing.T) {
+	t.Parallel()
+
+	runtimeSpec := &spec.RuntimeSpec{BaseURL: "https://api.example.com"}
+	op := &spec.Operation{
+		Method:         "GET",
+		Path:           "/storage/{storage_id}/files/{path}",
+		PathParamOrder: []string{"storage_id", "path"},
+	}
+
+	req, err := BuildRequest(context.Background(), apiKeyCreds("k"), runtimeSpec, op,
+		[]string{"user_files::aws-us-west-2", "reports/q 3#draft/a?b.csv"}, nil, "")
+	if err != nil {
+		t.Fatalf("BuildRequest() error = %v", err)
+	}
+	want := "https://api.example.com/storage/user_files::aws-us-west-2/files/reports/q%203%23draft/a%3Fb.csv"
+	if got := req.URL.String(); got != want {
+		t.Fatalf("url = %s, want %s", got, want)
+	}
+	if strings.Contains(req.URL.String(), "%2F") {
+		t.Fatalf("url must not encode / as %%2F: %s", req.URL.String())
+	}
+}
+
+func TestBuildRequestKeepsTrailingSlashOnFolderPathValue(t *testing.T) {
+	t.Parallel()
+
+	runtimeSpec := &spec.RuntimeSpec{BaseURL: "https://api.example.com"}
+	op := &spec.Operation{
+		Method:         "PUT",
+		Path:           "/storage/{storage_id}/directories/{path}",
+		PathParamOrder: []string{"storage_id", "path"},
+	}
+
+	req, err := BuildRequest(context.Background(), apiKeyCreds("k"), runtimeSpec, op,
+		[]string{"s", "a/b c/"}, nil, "")
+	if err != nil {
+		t.Fatalf("BuildRequest() error = %v", err)
+	}
+	if got, want := req.URL.String(), "https://api.example.com/storage/s/directories/a/b%20c/"; got != want {
+		t.Fatalf("url = %s, want %s", got, want)
+	}
+}
+
+func TestBuildRequestSingleSegmentPathValueUnchanged(t *testing.T) {
+	t.Parallel()
+
+	runtimeSpec := &spec.RuntimeSpec{BaseURL: "https://api.example.com"}
+	op := &spec.Operation{
+		Method:         "GET",
+		Path:           "/runs/{run_id}",
+		PathParamOrder: []string{"run_id"},
+	}
+
+	req, err := BuildRequest(context.Background(), apiKeyCreds("k"), runtimeSpec, op,
+		[]string{"run 1#x"}, nil, "")
+	if err != nil {
+		t.Fatalf("BuildRequest() error = %v", err)
+	}
+	if got, want := req.URL.String(), "https://api.example.com/runs/run%201%23x"; got != want {
+		t.Fatalf("url = %s, want %s", got, want)
+	}
+}

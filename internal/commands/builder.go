@@ -114,6 +114,7 @@ func BuildRootCommand(cfg config.Config, creds executor.Credentials, runtimeSpec
 	}
 
 	addJobsCustomCommands(root, cfg, creds, runtimeSpec, client, flags)
+	addFilesCommands(root, cfg, creds, runtimeSpec, client, flags)
 
 	return root
 }
