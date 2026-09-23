@@ -39,7 +39,7 @@ func TestUploadFileToPresignedURLServerError(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte("nope"))
+		_, _ = w.Write([]byte("<Error><Code>InvalidRequest</Code><Message>bad upload to org-42/user-7</Message></Error>"))
 	}))
 	defer server.Close()
 
@@ -51,7 +51,10 @@ func TestUploadFileToPresignedURLServerError(t *testing.T) {
 
 	client := &http.Client{Timeout: time.Second}
 	err := UploadFileToPresignedURL(context.Background(), client, server.URL, path)
-	if err == nil || !strings.Contains(err.Error(), "upload failed") {
-		t.Fatalf("expected upload failed error, got %v", err)
+	if err == nil || err.Error() != "upload failed with HTTP 400 (InvalidRequest)" {
+		t.Fatalf("expected status and code only, got %v", err)
+	}
+	if strings.Contains(err.Error(), "org-42") {
+		t.Fatalf("error must not include the storage body's message: %v", err)
 	}
 }

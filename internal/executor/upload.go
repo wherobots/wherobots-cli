@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -58,8 +57,7 @@ func UploadFileToPresignedURL(ctx context.Context, client *http.Client, uploadUR
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("upload failed with HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return newStorageError("upload", resp)
 	}
 
 	return nil

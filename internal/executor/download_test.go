@@ -207,12 +207,50 @@ func TestStreamFromURLReportsStorageError(t *testing.T) {
 
 	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte("<Error><Code>AccessDenied</Code></Error>"))
+		_, _ = w.Write([]byte("<Error><Code>AccessDenied</Code><Message>Access Denied for org-42/user-7</Message></Error>"))
 	}))
 	defer storage.Close()
 
 	_, err := StreamFromURL(context.Background(), &http.Client{}, storage.URL+"/obj", &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "HTTP 403") || !strings.Contains(err.Error(), "AccessDenied") {
-		t.Fatalf("err = %v, want HTTP 403 with storage body", err)
+		t.Fatalf("err = %v, want HTTP 403 with the AccessDenied code", err)
+	}
+	if strings.Contains(err.Error(), "Access Denied for") || strings.Contains(err.Error(), "org-42") {
+		t.Fatalf("err = %v, must not include the storage body's message", err)
+	}
+}
+
+func TestStreamFromURLReportsMissingObjectWithoutBody(t *testing.T) {
+	t.Parallel()
+
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<Error><Code>NoSuchKey</Code><Message>The specified key does not exist.</Message><Key>org-42/user-7/missing.csv</Key></Error>`))
+	}))
+	defer storage.Close()
+
+	_, err := StreamFromURL(context.Background(), &http.Client{}, storage.URL+"/obj", &bytes.Buffer{})
+	var storageErr *StorageError
+	if !errors.As(err, &storageErr) || storageErr.StatusCode != http.StatusNotFound || storageErr.Code != "NoSuchKey" {
+		t.Fatalf("err = %#v, want a StorageError of 404 with code NoSuchKey", err)
+	}
+	if got := err.Error(); got != "download failed with HTTP 404 (NoSuchKey)" {
+		t.Fatalf("err = %q, want no key or message", got)
+	}
+}
+
+func TestStorageErrorDropsCodeThatIsNotAPlainWord(t *testing.T) {
+	t.Parallel()
+
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("<Error><Code>bad code org-42/user-7</Code></Error>"))
+	}))
+	defer storage.Close()
+
+	_, err := StreamFromURL(context.Background(), &http.Client{}, storage.URL+"/obj", &bytes.Buffer{})
+	if err == nil || err.Error() != "download failed with HTTP 500" {
+		t.Fatalf("err = %v, want only the status", err)
 	}
 }
