@@ -507,6 +507,10 @@ func (c *DriveClient) DeleteDir(ctx context.Context, remote string, recursive bo
 			return c.mapError(ctx, err, folder)
 		}
 		if !c.dryRun() {
+			// A further page means more entries than the marker, so it is not empty.
+			if strings.TrimSpace(gjson.GetBytes(body, "next_page").String()) != "" {
+				return &FolderNotEmptyError{Path: folder}
+			}
 			for _, entry := range parseEntries(body) {
 				if strings.Trim(entry.Name, "/") != "" {
 					return &FolderNotEmptyError{Path: folder}

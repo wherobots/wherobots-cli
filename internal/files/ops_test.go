@@ -254,6 +254,28 @@ func TestDeleteDirRefusesNonEmptyUnlessRecursive(t *testing.T) {
 	}
 }
 
+func TestDeleteDirRefusesWhenMarkerHasNextPage(t *testing.T) {
+	t.Parallel()
+	api := newMockAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			_, _ = fmt.Fprint(w, `{"items":[{"name":"","type":"FOLDER"}],"next_page":"c1"}`)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	err := api.drive(t, nil).DeleteDir(context.Background(), "reports", false)
+	var notEmpty *FolderNotEmptyError
+	if !errors.As(err, &notEmpty) {
+		t.Fatalf("err = %v, want folder-not-empty", err)
+	}
+	for _, req := range api.requests {
+		if req.Method == http.MethodDelete {
+			t.Fatalf("a DELETE was sent although next_page showed more entries")
+		}
+	}
+}
+
 func TestDeleteFileRefusesFolderPath(t *testing.T) {
 	t.Parallel()
 	api := newMockAPI(t, func(http.ResponseWriter, *http.Request) {})

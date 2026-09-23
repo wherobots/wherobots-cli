@@ -224,7 +224,7 @@ wherobots files my-files rmdir reports --recursive       # deletes the folder an
 | `--region` | all | Region of the files area. Default: your organization's default region. |
 | `--output` | `ls` | `text` (TYPE / SIZE / MODIFIED / NAME table) or `json`. |
 | `--recursive`, `-r` | `rmdir` | Delete a folder that is not empty, with everything in it. |
-| `--dry-run` | all | Print each API request as `curl` without sending it. |
+| `--dry-run` | all | Print each API request as `curl` without sending it. Without `--region`, the organization is still looked up (GET /organization) to find the default region. |
 
 Notes:
 
