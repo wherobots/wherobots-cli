@@ -10,9 +10,11 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"text/tabwriter"
 	"time"
 
@@ -315,7 +317,9 @@ func (r *filesRunner) newUploadCommand(open openDrive) *cobra.Command {
 				return err
 			}
 			local, remote := args[0], args[1]
-			target, err := drive.Upload(cmd.Context(), remote, local)
+			ctx, stop := interruptContext(cmd.Context())
+			defer stop()
+			target, err := drive.Upload(ctx, remote, local)
 			if err != nil {
 				return err
 			}
@@ -351,8 +355,10 @@ func (r *filesRunner) newDownloadCommand(open openDrive) *cobra.Command {
 			if r.dryRun() {
 				return drive.Download(cmd.Context(), args[0], io.Discard)
 			}
+			ctx, stop := interruptContext(cmd.Context())
+			defer stop()
 			if err := writeFileAtomically(dest, func(w io.Writer) error {
-				return drive.Download(cmd.Context(), args[0], w)
+				return drive.Download(ctx, args[0], w)
 			}); err != nil {
 				return err
 			}
@@ -385,7 +391,9 @@ func (r *filesRunner) newCatCommand(open openDrive) *cobra.Command {
 				_ = tmp.Close()
 				_ = os.Remove(tmp.Name())
 			}()
-			if err := drive.Download(cmd.Context(), args[0], tmp); err != nil {
+			ctx, stop := interruptContext(cmd.Context())
+			defer stop()
+			if err := drive.Download(ctx, args[0], tmp); err != nil {
 				return err
 			}
 			if _, err := tmp.Seek(0, io.SeekStart); err != nil {
@@ -477,6 +485,17 @@ func (r *filesRunner) report(cmd *cobra.Command, format string, args ...any) err
 	}
 	_, err := fmt.Fprintf(cmd.OutOrStdout(), format, args...)
 	return err
+}
+
+// interruptContext is cancelled by the first Ctrl-C or SIGTERM so a transfer
+// unwinds through its cleanup; a second signal kills the process as usual.
+func interruptContext(parent context.Context) (context.Context, context.CancelFunc) {
+	ctx, stop := signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
+	return ctx, stop
 }
 
 // writeFileAtomically fills a temporary file beside dest and renames it into

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -25,21 +23,10 @@ var (
 )
 
 func main() {
-	if err := run(interruptContext()); err != nil {
+	if err := run(context.Background()); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
-}
-
-// interruptContext is cancelled by the first Ctrl-C or SIGTERM so commands
-// unwind through their cleanup; a second signal kills the process as usual.
-func interruptContext() context.Context {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-ctx.Done()
-		stop()
-	}()
-	return ctx
 }
 
 func run(ctx context.Context) error {
