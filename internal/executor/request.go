@@ -227,6 +227,8 @@ type Credentials interface {
 	ForceRefresh(ctx context.Context) (bool, error)
 }
 
+// BuildRequest builds an authenticated request. Every path parameter is
+// escaped as one segment, so a "/" inside a value is sent as %2F.
 func BuildRequest(
 	ctx context.Context,
 	creds Credentials,
@@ -235,6 +237,38 @@ func BuildRequest(
 	pathArgs []string,
 	queryPairs []QueryPair,
 	jsonBody string,
+) (*http.Request, error) {
+	return buildRequest(ctx, creds, runtimeSpec, op, pathArgs, queryPairs, jsonBody, nil)
+}
+
+// BuildRequestMultiSegment is BuildRequest for routes whose named path
+// parameters are greedy (e.g. FastAPI {path:path}): those keep "/" as-is.
+func BuildRequestMultiSegment(
+	ctx context.Context,
+	creds Credentials,
+	runtimeSpec *spec.RuntimeSpec,
+	op *spec.Operation,
+	multiSegment []string,
+	pathArgs []string,
+	queryPairs []QueryPair,
+	jsonBody string,
+) (*http.Request, error) {
+	keep := make(map[string]bool, len(multiSegment))
+	for _, name := range multiSegment {
+		keep[name] = true
+	}
+	return buildRequest(ctx, creds, runtimeSpec, op, pathArgs, queryPairs, jsonBody, keep)
+}
+
+func buildRequest(
+	ctx context.Context,
+	creds Credentials,
+	runtimeSpec *spec.RuntimeSpec,
+	op *spec.Operation,
+	pathArgs []string,
+	queryPairs []QueryPair,
+	jsonBody string,
+	multiSegment map[string]bool,
 ) (*http.Request, error) {
 	if runtimeSpec == nil || op == nil {
 		return nil, fmt.Errorf("missing runtime operation context")
@@ -253,7 +287,11 @@ func BuildRequest(
 
 	resolvedPath := op.Path
 	for idx, paramName := range op.PathParamOrder {
-		resolvedPath = strings.ReplaceAll(resolvedPath, "{"+paramName+"}", url.PathEscape(pathArgs[idx]))
+		escaped := url.PathEscape(pathArgs[idx])
+		if multiSegment[paramName] {
+			escaped = escapePathValue(pathArgs[idx])
+		}
+		resolvedPath = strings.ReplaceAll(resolvedPath, "{"+paramName+"}", escaped)
 	}
 	if strings.Contains(resolvedPath, "{") {
 		return nil, fmt.Errorf("unresolved path parameters in %q", resolvedPath)
@@ -327,6 +365,17 @@ func BuildRequest(
 	return req, nil
 }
 
+// escapePathValue percent-encodes each "/"-separated segment of a path
+// parameter and rejoins them with "/", so greedy server routes such as
+// FastAPI's {path:path} receive real path separators rather than %2F.
+func escapePathValue(value string) string {
+	segments := strings.Split(value, "/")
+	for i, segment := range segments {
+		segments[i] = url.PathEscape(segment)
+	}
+	return strings.Join(segments, "/")
+}
+
 func Do(client *http.Client, req *http.Request) ([]byte, error) {
 	resp, err := client.Do(req)
 	if err != nil {
@@ -354,25 +403,39 @@ func DoWithReauth(client *http.Client, req *http.Request, creds Credentials) ([]
 		return body, err
 	}
 
-	ok, refreshErr := creds.ForceRefresh(req.Context())
-	if refreshErr != nil {
-		// "Session expired — sign in again" beats a bare 401.
-		return nil, refreshErr
+	retry, ok, retryErr := refreshedReplay(req, creds)
+	if retryErr != nil {
+		return nil, retryErr
 	}
 	if !ok {
 		return body, err
+	}
+	return Do(client, retry)
+}
+
+// refreshedReplay forces one credential refresh after a 401 and returns a
+// clone of req carrying the fresh credentials and a rewound body. ok is false
+// when there is nothing to refresh, so the caller keeps the original 401.
+func refreshedReplay(req *http.Request, creds Credentials) (*http.Request, bool, error) {
+	ok, refreshErr := creds.ForceRefresh(req.Context())
+	if refreshErr != nil {
+		// "Session expired — sign in again" beats a bare 401.
+		return nil, false, refreshErr
+	}
+	if !ok {
+		return nil, false, nil
 	}
 
 	retry := req.Clone(req.Context())
 	if req.GetBody != nil {
 		retryBody, bodyErr := req.GetBody()
 		if bodyErr != nil {
-			return nil, fmt.Errorf("rewind request body for 401 retry: %w", bodyErr)
+			return nil, false, fmt.Errorf("rewind request body for 401 retry: %w", bodyErr)
 		}
 		retry.Body = retryBody
 	}
 	if applyErr := creds.Apply(retry.Context(), retry); applyErr != nil {
-		return nil, applyErr
+		return nil, false, applyErr
 	}
-	return Do(client, retry)
+	return retry, true, nil
 }

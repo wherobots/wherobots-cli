@@ -83,11 +83,12 @@ Sessions are stored per OAuth domain, so production and staging sign-ins coexist
 
 ## Commands
 
-The CLI has two command groups:
+The CLI has three command groups:
 
 | Group | Description |
 |-------|-------------|
 | `wherobots job-runs <subcommand>` | Purpose-built commands for creating, monitoring, and listing job runs. |
+| `wherobots files my-files <subcommand>` | Commands for your personal area in Wherobots Files: list, create folders, upload, download, rename, delete. |
 | `wherobots api <resource> ... <verb>` | Dynamically generated commands covering every Wherobots API endpoint. |
 
 ### `job-runs` — Job run management
@@ -196,6 +197,43 @@ wherobots job-runs metrics <run-id> --output text
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--output` | Output format: `text` or `json`. | `json` |
+
+### `files` — Wherobots Files
+
+Work with one file or folder at a time in your personal Files area (`my-files`). Every path is a remote path, relative to the area's root: a leading `/` is ignored, a trailing `/` names a folder, and empty levels, `.` and `..` are refused.
+
+```bash
+wherobots files my-files ls                              # list the root
+wherobots files my-files ls reports/2026 --output json   # list a folder as JSON
+wherobots files my-files mkdir reports/2026/q3           # creates each missing level in turn
+wherobots files my-files upload ./q3.csv reports/q3.csv  # <local file> <remote path>
+wherobots files my-files upload ./q3.csv reports/        # keeps the local name: reports/q3.csv
+wherobots files my-files download reports/q3.csv         # saves ./q3.csv
+wherobots files my-files download reports/q3.csv ./out/  # saves ./out/q3.csv
+wherobots files my-files cat reports/q3.csv              # prints to stdout
+wherobots files my-files mv reports/q3.csv q3-final.csv  # rename within the same folder
+wherobots files my-files rm reports/q3-final.csv
+wherobots files my-files rmdir reports/2026/q3           # refused if not empty
+wherobots files my-files rmdir reports --recursive       # deletes the folder and everything in it
+```
+
+**Region:** each region has its own files area. Commands use `--region` when given (for example `wherobots files my-files --region aws-us-west-2 ls`), otherwise your organization's default region.
+
+| Flag | Applies to | Description |
+|------|------------|-------------|
+| `--region` | all | Region of the files area. Default: your organization's default region. |
+| `--output` | `ls` | `text` (TYPE / SIZE / MODIFIED / NAME table) or `json`. |
+| `--recursive`, `-r` | `rmdir` | Delete a folder that is not empty, with everything in it. |
+| `--dry-run` | all | Print each API request as `curl` without sending it. Without `--region`, the organization is still looked up (GET /organization) to find the default region. |
+
+Notes:
+
+- `upload` accepts files up to 500 MB.
+- `mv` renames within a folder; moving a file to another folder is not supported.
+- `rmdir` without `--recursive` checks that the folder is empty, then deletes it in a second request; anything added to the folder in between is deleted with it.
+- Downloads go straight to storage through a presigned link; your API key or sign-in token is never sent there. A failed download leaves no partial file.
+- Uploads and downloads have no overall time limit; press Ctrl-C to stop a stalled transfer.
+- "Files is not enabled for my-files in region X" means the Files area is not available to you in that region; try another `--region`.
 
 ### `api` — Full Wherobots API access
 
