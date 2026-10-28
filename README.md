@@ -269,13 +269,13 @@ All configuration is done through environment variables.
 | `WHEROBOTS_OAUTH_CLIENT_ID` | No | OAuth client ID used by `wherobots auth login`. | _(production CLI client)_ |
 | `WHEROBOTS_UPLOAD_PATH` | No | Default S3 root for local file uploads in `job-runs create`. | _(auto-resolved from your account)_ |
 | `OPENAPI_CACHE_TTL` | No | How long to cache the OpenAPI spec (Go duration, e.g. `15m`). | `15m` |
-| `OPENAPI_HTTP_TIMEOUT` | No | Timeout for API, spec, and sign-in requests (Go duration, e.g. `45s`; a bare integer means minutes). `files` uploads and downloads have no timeout. | `30s` |
+| `OPENAPI_HTTP_TIMEOUT` | No | Timeout for API, spec, and sign-in requests (Go duration, e.g. `45s`; a bare integer means minutes). `files` uploads and downloads have no timeout; `job-runs create` script uploads use it. | `30s` |
 
 The OpenAPI spec is cached in your user cache dir, one file per API URL: `~/.cache/wherobots/spec-<hash>.json` on Linux, `~/Library/Caches/wherobots/spec-<hash>.json` on macOS. If a fresh fetch fails, the cached version is used as a fallback.
 
 ## Output
 
-- **Success:** raw JSON response body printed to `stdout`.
+- **Success:** `api` commands print the raw JSON response body to `stdout`.
 - **Failure:** error message printed to `stderr` with a non-zero exit code.
 - `job-runs` commands print human-readable text by default; pass `--output json` for JSON.
 - For non-JSON API responses or endpoints requiring file upload/download, use `--dry-run` to get a `curl` command you can execute and customize.

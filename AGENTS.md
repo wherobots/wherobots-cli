@@ -69,3 +69,4 @@ The CLI builds its command tree at startup from a live OpenAPI spec. `internal/s
 
 - **PR validation** (`.github/workflows/pr-validate.yml`): runs `go test` and `go build` on every PR
 - **Release** (`.github/workflows/release.yml`): on push to main, builds all 6 platform binaries (darwin/linux/windows x amd64/arm64), generates SHA-256 checksums, publishes as rolling `latest-prerelease` GitHub release
+- **Tagged release** (`.github/workflows/tagged-release.yml`): on a `v*` tag push, runs tests, builds the same 6 binaries with the version injected, and publishes a versioned GitHub release (see `RELEASE.md`)
