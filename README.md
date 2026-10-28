@@ -116,8 +116,8 @@ wherobots job-runs create ./script.py --name my-job-001 --upload-path s3://my-bu
 | Flag | Description | Default |
 |------|-------------|---------|
 | `-n, --name` | **Required.** Name for the job run. | — |
-| `-r, --runtime` | Wherobots runtime size; accepts any runtime string. Leave unset to use your organization's default. Shell completion lists your available runtimes. | _(org default)_ |
-| `--run-region` | Region to run the job in; accepts any region string (BYOC regions included). Leave unset to use your organization's default. Shell completion lists your available regions. | _(org default)_ |
+| `-r, --runtime` | Wherobots runtime size; accepts any runtime string. Leave unset to use your organization's default. | _(org default)_ |
+| `--run-region` | Region to run the job in; accepts any region string (BYOC regions included). Leave unset to use your organization's default. | _(org default)_ |
 | `--timeout` | Run timeout in seconds. | `3600` |
 | `--args` | Arguments passed to the script. | — |
 | `-c, --spark-config` | Repeatable Spark config key=value pairs. | — |
@@ -127,7 +127,7 @@ wherobots job-runs create ./script.py --name my-job-001 --upload-path s3://my-bu
 | `-w, --watch` | Stream logs after submission until the run completes. | `false` |
 | `--no-upload` | Skip auto-upload of local files. | `false` |
 | `--upload-path` | Custom S3 root for uploading local files. | — |
-| `--output` | Output format: `text` or `json`. | `json` |
+| `--output` | Output format: `text` or `json`. | `text` |
 
 #### `job-runs logs`
 
@@ -156,11 +156,11 @@ wherobots job-runs logs <run-id> --tail 50
 List job runs, optionally filtered by status, name, or region.
 
 ```bash
-# list recent runs (JSON output)
+# list recent runs as a table
 wherobots job-runs list
 
-# human-readable table
-wherobots job-runs list --output text
+# JSON output
+wherobots job-runs list --output json
 
 # filter by status
 wherobots job-runs list --status RUNNING --status FAILED
@@ -173,17 +173,7 @@ wherobots job-runs list --status RUNNING --status FAILED
 | `--after` | Return runs created after this cursor/timestamp. | — |
 | `-l, --limit` | Maximum number of results. | `20` |
 | `--region` | Filter by region. | — |
-| `--output` | Output format: `text` or `json`. | `json` |
-
-#### `job-runs running` / `job-runs failed` / `job-runs completed`
-
-Shorthand aliases equivalent to `job-runs list --status RUNNING`, `--status FAILED`, or `--status COMPLETED`. They accept the same flags as `job-runs list` except `--status`.
-
-```bash
-wherobots job-runs running
-wherobots job-runs failed --output text
-wherobots job-runs completed --limit 5
-```
+| `--output` | Output format: `text` or `json`. | `text` |
 
 #### `job-runs metrics`
 
@@ -191,12 +181,12 @@ Display instant metrics (CPU, memory, etc.) for a running or recently completed 
 
 ```bash
 wherobots job-runs metrics <run-id>
-wherobots job-runs metrics <run-id> --output text
+wherobots job-runs metrics <run-id> --output json
 ```
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--output` | Output format: `text` or `json`. | `json` |
+| `--output` | Output format: `text` or `json`. | `text` |
 
 ### `files` — Wherobots Files
 
@@ -264,6 +254,7 @@ wherobots api <resource> [<sub-resource> ...] <verb> [flags]
 | `--json '<raw-json>'` | Raw JSON request body (overrides individual body-field flags). |
 | `-q, --query key=value` | Repeatable query parameter (last value wins for duplicate keys). |
 | `--dry-run` | Print the equivalent `curl` command instead of executing the request. |
+| `-y, --yes` | Skip the `Proceed? [y/N]` prompt on POST, PUT, PATCH, and DELETE. Required in CI and scripts, where the prompt reads no answer and aborts. |
 | `--tree` | Print the command tree from this point. |
 
 ## Configuration
@@ -278,15 +269,15 @@ All configuration is done through environment variables.
 | `WHEROBOTS_OAUTH_CLIENT_ID` | No | OAuth client ID used by `wherobots auth login`. | _(production CLI client)_ |
 | `WHEROBOTS_UPLOAD_PATH` | No | Default S3 root for local file uploads in `job-runs create`. | _(auto-resolved from your account)_ |
 | `OPENAPI_CACHE_TTL` | No | How long to cache the OpenAPI spec (Go duration, e.g. `15m`). | `15m` |
-| `OPENAPI_HTTP_TIMEOUT` | No | Timeout for fetching the OpenAPI spec (Go duration). | _(default)_ |
+| `OPENAPI_HTTP_TIMEOUT` | No | Timeout for API, spec, and sign-in requests (Go duration, e.g. `45s`; a bare integer means minutes). `files` uploads and downloads have no timeout. | `30s` |
 
-The OpenAPI spec is cached locally at `~/.cache/wherobots/spec.json`. If a fresh fetch fails, the cached version is used as a fallback.
+The OpenAPI spec is cached in your user cache dir, one file per API URL: `~/.cache/wherobots/spec-<hash>.json` on Linux, `~/Library/Caches/wherobots/spec-<hash>.json` on macOS. If a fresh fetch fails, the cached version is used as a fallback.
 
 ## Output
 
 - **Success:** raw JSON response body printed to `stdout`.
 - **Failure:** error message printed to `stderr` with a non-zero exit code.
-- `job-runs` commands support `--output text` for human-readable table output.
+- `job-runs` commands print human-readable text by default; pass `--output json` for JSON.
 - For non-JSON API responses or endpoints requiring file upload/download, use `--dry-run` to get a `curl` command you can execute and customize.
 
 ## Dependencies
