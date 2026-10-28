@@ -31,11 +31,11 @@ Runtime credentials: `wherobots auth login` (OAuth device flow, stored session) 
 
 ### Dynamic Command Generation
 
-The CLI builds its command tree at startup from a live OpenAPI spec. `internal/spec/loader.go` fetches and caches the spec (`~/.cache/wherobots/spec.json`, 15min TTL), `internal/spec/parser.go` extracts operations, and `internal/commands/builder.go` converts each operation into a Cobra command with flags for path params, query params, and request body fields.
+The CLI builds its command tree at startup from a live OpenAPI spec. `internal/spec/loader.go` fetches and caches the spec (`os.UserCacheDir()/wherobots/spec-<hash>.json`, one file per API URL, 15min TTL), `internal/spec/parser.go` extracts operations, and `internal/commands/builder.go` converts each operation into a Cobra command with flags for path params, query params, and request body fields.
 
 ### Curated `job-runs` Commands
 
-`internal/commands/jobs.go` defines hand-written commands (`create`, `logs`, `list`, `running`, `failed`, `completed`, `metrics`) that layer workflow logic on top of the API: auto-uploading local scripts to S3 via presigned URLs, log streaming with polling, status watching, and formatted output.
+`internal/commands/jobs.go` defines hand-written commands (`create`, `logs`, `list`, `metrics`) that layer workflow logic on top of the API: auto-uploading local scripts to S3 via presigned URLs, log streaming with polling, status watching, and formatted output.
 
 ### Curated `files` Commands
 
@@ -59,7 +59,7 @@ The CLI builds its command tree at startup from a live OpenAPI spec. `internal/s
 | `internal/executor` | HTTP request construction, execution, dry-run, file upload and download |
 | `internal/config` | Env-var-based configuration loading |
 | `internal/hints` | Schema-aware error messages for invalid arguments |
-| `internal/version` | Background update checking via `gh release view` |
+| `internal/version` | Background update check against the GitHub releases API (the `upgrade` command is in `internal/commands/upgrade.go`) |
 
 ### Version Injection
 
@@ -69,4 +69,4 @@ The CLI builds its command tree at startup from a live OpenAPI spec. `internal/s
 
 - **PR validation** (`.github/workflows/pr-validate.yml`): runs `go test` and `go build` on every PR
 - **Release** (`.github/workflows/release.yml`): on push to main, builds all 6 platform binaries (darwin/linux/windows x amd64/arm64), generates SHA-256 checksums, publishes as rolling `latest-prerelease` GitHub release
-- **GoReleaser** (`.goreleaser.yaml`): configures cross-platform builds and archive formats
+- **Tagged release** (`.github/workflows/tagged-release.yml`): on a `v*` tag push, runs tests, builds the same 6 binaries with the version injected, and publishes a versioned GitHub release (see `RELEASE.md`)
