@@ -275,7 +275,7 @@ The OpenAPI spec is cached in your user cache dir, one file per API URL: `~/.cac
 
 ## Output
 
-- **Success:** `api` commands print the raw JSON response body to `stdout`.
+- **Success:** `api` commands print the raw JSON response body to `stdout`. If the response has no body (for example a 204), they print nothing and exit 0.
 - **Failure:** error message printed to `stderr` with a non-zero exit code.
 - `job-runs` commands print human-readable text by default; pass `--output json` for JSON (not supported with `job-runs logs --follow`).
 - For non-JSON API responses or endpoints requiring file upload/download, use `--dry-run` to get a `curl` command you can execute and customize.
