@@ -751,6 +751,30 @@ func TestApiSubtreeEmitsDottedResourceCommandInClientHeader(t *testing.T) {
 	}
 }
 
+func TestJobsListSendsEveryStatus(t *testing.T) {
+	t.Parallel()
+
+	var got []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.URL.Query()["status"]
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"items":[],"total":0,"next_page":null}`)
+	}))
+	defer server.Close()
+
+	root := buildJobsTestRoot(server.URL)
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"job-runs", "list", "--status", "running", "--status", "FAILED"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if !equalStrings(got, []string{"RUNNING", "FAILED"}) {
+		t.Fatalf("expected both statuses, got %v", got)
+	}
+}
+
 func TestJobsRunningAliasFiltersStatus(t *testing.T) {
 	t.Parallel()
 

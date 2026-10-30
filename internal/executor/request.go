@@ -314,7 +314,7 @@ func buildRequest(
 		if pair.Key == "" {
 			return nil, fmt.Errorf("query key cannot be empty")
 		}
-		queryValues.Set(pair.Key, pair.Value)
+		queryValues.Add(pair.Key, pair.Value)
 		seenQuery[pair.Key] = struct{}{}
 	}
 	for required := range requiredQuery {
