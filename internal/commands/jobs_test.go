@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"wherobots/cli/internal/api"
 	"wherobots/cli/internal/auth"
 	"wherobots/cli/internal/config"
 	"wherobots/cli/internal/spec"
@@ -853,6 +855,9 @@ func TestJobsMetricsTextOutput(t *testing.T) {
 	if !strings.Contains(got, "Consumed Spatial Units") || !strings.Contains(got, "150") {
 		t.Fatalf("expected Consumed Spatial Units as number, got %q", got)
 	}
+	if cpu, consumed, cost := strings.Index(got, "CPU"), strings.Index(got, "Consumed"), strings.Index(got, "Cost"); cpu > consumed || consumed > cost {
+		t.Fatalf("expected metrics sorted by name, got %q", got)
+	}
 }
 
 func TestJobsMetricsJsonOutput(t *testing.T) {
@@ -946,7 +951,7 @@ func TestFormatMetricValue(t *testing.T) {
 
 	tests := []struct {
 		value    float64
-		format   string
+		format   api.DataFormat
 		expected string
 	}{
 		{45.2, "PERCENTAGE", "45.2%"},
@@ -1029,6 +1034,68 @@ func TestJobsListDryRunSkipsRequest(t *testing.T) {
 	got := strings.TrimSpace(out.String())
 	if !strings.HasPrefix(got, "curl -X GET '"+server.URL+"/runs") {
 		t.Fatalf("expected curl GET %s/runs, got %q", server.URL, got)
+	}
+}
+
+func TestBuildRunPayloadWireFormat(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name, script, jarMainClass, want string
+	}{
+		{
+			name:   "python with environment",
+			script: "s3://bucket/job.py",
+			want: `{"name":"test-job-001","runPython":{"args":["--day","1"],"uri":"s3://bucket/job.py"},"runtime":"tiny","timeoutSeconds":60,
+				"environment":{"dependencies":[{"libraryName":"numpy","libraryVersion":"2.0","sourceType":"PYPI"},{"filePath":"s3://bucket/lib.whl","sourceType":"FILE"}],"sparkConfigs":{"spark.a":"b"}}}`,
+		},
+		{
+			name:         "jar",
+			script:       "s3://bucket/job.jar",
+			jarMainClass: "com.Main",
+			want: `{"name":"test-job-001","runJar":{"args":["--day","1"],"mainClass":"com.Main","uri":"s3://bucket/job.jar"},"runtime":"tiny","timeoutSeconds":60,
+				"environment":{"dependencies":[{"libraryName":"numpy","libraryVersion":"2.0","sourceType":"PYPI"},{"filePath":"s3://bucket/lib.whl","sourceType":"FILE"}],"sparkConfigs":{"spark.a":"b"}}}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			payload, err := buildRunPayload(tt.script, "test-job-001", "tiny", 60, "--day 1", []string{"spark.a=b"}, []string{"numpy==2.0"}, []string{"s3://bucket/lib.whl"}, tt.jarMainClass)
+			if err != nil {
+				t.Fatalf("buildRunPayload() error = %v", err)
+			}
+			encoded, err := json.Marshal(payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got, want any
+			if err := json.Unmarshal(encoded, &got); err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal([]byte(tt.want), &want); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("payload = %s, want %s", encoded, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildRunPayloadOmitsEmptyOptionalFields(t *testing.T) {
+	t.Parallel()
+
+	payload, err := buildRunPayload("s3://bucket/job.py", "test-job-001", "", 60, "", nil, nil, nil, "")
+	if err != nil {
+		t.Fatalf("buildRunPayload() error = %v", err)
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"name":"test-job-001","runPython":{"args":[],"uri":"s3://bucket/job.py"},"timeoutSeconds":60}`
+	if string(encoded) != want {
+		t.Fatalf("payload = %s, want %s", encoded, want)
 	}
 }
 
