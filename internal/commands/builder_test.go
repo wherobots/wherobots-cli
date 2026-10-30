@@ -352,3 +352,64 @@ func TestAPICommandErrorReturnsRawJSONEnvelope(t *testing.T) {
 		t.Fatalf("expected wrapped *executor.HTTPError with status 400, got %v", err)
 	}
 }
+
+func TestAPICommandEmptyResponseBody(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		status  int
+		wantErr string
+	}{
+		{name: "204 succeeds", status: http.StatusNoContent},
+		{name: "202 succeeds", status: http.StatusAccepted},
+		{name: "500 fails", status: http.StatusInternalServerError, wantErr: "request failed with HTTP 500"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var gotPath string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotPath = r.URL.Path
+				w.WriteHeader(tt.status)
+			}))
+			defer server.Close()
+
+			cfg := config.Config{AppName: "wherobots", APIKey: "test-key", HTTPTimeout: time.Second}
+			runtimeSpec := &spec.RuntimeSpec{
+				BaseURL: server.URL,
+				Operations: []*spec.Operation{
+					{
+						Method:         "DELETE",
+						Path:           "/triggers/{id}",
+						PathParams:     []spec.Parameter{{Name: "id", Location: "path", Required: true, Type: "string"}},
+						PathParamOrder: []string{"id"},
+					},
+				},
+			}
+
+			root := BuildRootCommand(cfg, auth.NewResolver(cfg), runtimeSpec)
+			var stdout, stderr bytes.Buffer
+			root.SetOut(&stdout)
+			root.SetErr(&stderr)
+			root.SetArgs([]string{"api", "triggers", "delete", "--id", "t-1", "--yes"})
+
+			err := root.Execute()
+
+			if tt.wantErr == "" && err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+			if tt.wantErr != "" && (err == nil || err.Error() != tt.wantErr) {
+				t.Fatalf("Execute() error = %v, want %q", err, tt.wantErr)
+			}
+			if gotPath != "/triggers/t-1" {
+				t.Fatalf("server saw path %q, want /triggers/t-1", gotPath)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("stdout = %q, want empty", stdout.String())
+			}
+		})
+	}
+}
