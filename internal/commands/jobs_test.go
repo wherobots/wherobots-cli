@@ -36,7 +36,7 @@ func TestJobsRunNoWatchPrintsSummary(t *testing.T) {
 			_, _ = io.WriteString(w, `{"name":"root","path":"s3://managed-bucket/customer/root"}`)
 		case r.Method == http.MethodPost && r.URL.Path == "/runs":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = io.WriteString(w, `{"id":"run-123","name":"test-job-001","status":"PENDING","createTime":"2026-01-01T00:00:00Z","payload":{"runtime":"tiny","region":"aws-us-west-2"}}`)
+			_, _ = io.WriteString(w, `{"id":"run-123","name":"test-job-001","status":"PENDING","createTime":"2026-01-01T00:00:00Z","payload":{"runtime":"tiny"},"kubeApp":{"regionName":"aws-us-west-2"}}`)
 		default:
 			http.NotFound(w, r)
 		}
@@ -619,7 +619,7 @@ func TestJobsListDefaultsToText(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/runs" {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = io.WriteString(w, `{"items":[{"id":"run-1","name":"a","status":"RUNNING","createTime":"2026-01-01T00:00:00Z","payload":{"runtime":"tiny","region":"aws-us-west-2"}}],"total":1,"next_page":null}`)
+			_, _ = io.WriteString(w, `{"items":[{"id":"run-1","name":"a","status":"RUNNING","createTime":"2026-01-01T00:00:00Z","payload":{"runtime":"tiny"},"kubeApp":{"regionName":"aws-us-west-2"}}],"total":1,"next_page":null}`)
 			return
 		}
 		http.NotFound(w, r)
@@ -639,6 +639,9 @@ func TestJobsListDefaultsToText(t *testing.T) {
 	got := out.String()
 	if !strings.Contains(got, "ID") || !strings.Contains(got, "run-1") {
 		t.Fatalf("expected text table output by default, got %q", got)
+	}
+	if !strings.Contains(got, "aws-us-west-2") {
+		t.Fatalf("expected the run's region, got %q", got)
 	}
 	if gjsonValid(strings.TrimSpace(got)) {
 		t.Fatalf("expected text output by default, got JSON: %q", got)

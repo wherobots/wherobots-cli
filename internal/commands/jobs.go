@@ -823,7 +823,7 @@ func writeRunSummary(out io.Writer, body []byte) error {
 	status := gjson.GetBytes(body, "status").String()
 	created := gjson.GetBytes(body, "createTime").String()
 	runtimeID := gjson.GetBytes(body, "payload.runtime").String()
-	region := gjson.GetBytes(body, "payload.region").String()
+	region := gjson.GetBytes(body, "kubeApp.regionName").String()
 
 	pairs := [][2]string{
 		{"ID", id},
@@ -867,7 +867,7 @@ func writeRunListTable(out io.Writer, body []byte) error {
 		status := item.Get("status").String()
 		created := item.Get("createTime").String()
 		runtimeID := item.Get("payload.runtime").String()
-		region := item.Get("payload.region").String()
+		region := item.Get("kubeApp.regionName").String()
 		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", id, name, status, created, runtimeID, region); err != nil {
 			return err
 		}
