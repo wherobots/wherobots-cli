@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"wherobots/cli/internal/config"
+	"wherobots/cli/internal/httpclient"
 )
 
 // refreshSkew treats a token as expired shortly before its real expiry so an
@@ -35,7 +36,7 @@ func NewResolver(cfg config.Config) *Resolver {
 		client: &Client{
 			Domain:   cfg.OAuthDomain,
 			ClientID: cfg.OAuthClientID,
-			HTTP:     &http.Client{Timeout: cfg.HTTPTimeout},
+			HTTP:     httpclient.New(cfg.HTTPTimeout),
 		},
 		now: time.Now,
 	}

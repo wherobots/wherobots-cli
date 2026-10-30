@@ -16,6 +16,7 @@ import (
 	"wherobots/cli/internal/config"
 	"wherobots/cli/internal/executor"
 	"wherobots/cli/internal/hints"
+	"wherobots/cli/internal/httpclient"
 	"wherobots/cli/internal/spec"
 )
 
@@ -50,7 +51,7 @@ type bodyBinding struct {
 
 func BuildRootCommand(cfg config.Config, creds executor.Credentials, runtimeSpec *spec.RuntimeSpec) *cobra.Command {
 	flags := &GlobalFlags{}
-	client := &http.Client{Timeout: cfg.HTTPTimeout}
+	client := httpclient.New(cfg.HTTPTimeout)
 	operationByCommand := map[*cobra.Command]*spec.Operation{}
 	resourceCommands := map[string]*cobra.Command{}
 

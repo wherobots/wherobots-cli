@@ -52,7 +52,7 @@ func UploadFileToPresignedURL(ctx context.Context, client *http.Client, uploadUR
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("upload request failed: %w", err)
+		return fmt.Errorf("upload request failed: %w", withoutURL(err))
 	}
 	defer resp.Body.Close()
 
