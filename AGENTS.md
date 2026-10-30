@@ -18,6 +18,8 @@ make fmt            # go fmt ./...
 make tidy           # go mod tidy
 make run ARGS='...' # run without building (e.g., make run ARGS='job-runs list')
 make clean          # remove bin/
+make generate       # regenerate internal/api/api.gen.go from the committed spec snapshot
+make update-spec    # refresh the snapshot from the prod spec, then regenerate
 ```
 
 Run a single test:
@@ -41,6 +43,12 @@ The CLI builds its command tree at startup from a live OpenAPI spec. `internal/s
 
 `internal/commands/files.go` builds the `files` → `my-files` → verb tree over the `/storage/{storage_id}/...` file routes (group skipped if the spec lacks them). `internal/files` holds the logic: `drive.go` maps a drive to its storage id (`my-files` → `user_files::<region>`; a future shared drive adds a kind there), and `ops.go` implements every operation once against a drive — path checks, `limit`+cursor listing, level-by-level `mkdir`, presigned upload/download, and mapping of 401/404 to "not signed in", "Files is not enabled for <drive> in region <r>" and "no such file or folder". Region is `--region`, else the org's `defaultRegion`.
 
+### Generated API Types
+
+The curated commands use types from `internal/api`, never hand-written paths, JSON field names, or enum values. `operations.txt` lists the operationIds they call. To call another operation, add it there and run `make update-spec`. `tools/apigen`, a separate module so the generator stays out of the CLI's dependencies, filters the prod spec to those operations and the schemas they reach (`openapi.snapshot.json`), then runs oapi-codegen for models only (`api.gen.go`). `make generate` works offline from the snapshot and CI fails if its output differs from what is committed.
+
+The executor still sends every request: `api.GetJobRun.Method`/`.Path` find the runtime spec operation, `api.GetJobRun.Decode` parses the response, and `executor.QueryParams` turns a generated `...Params` struct into query pairs. A new `RunStatus` must be classified in `classifyRun`; a test fails until it is.
+
 ### Request Execution Pipeline
 
 `internal/executor/request.go` builds authenticated HTTP requests via the `Credentials` interface (implemented by `internal/auth.Resolver`: `x-api-key` header for API keys, `Authorization: Bearer` for OAuth sessions, with proactive refresh and a one-shot 401 refresh-replay in `DoWithReauth`). `dryrun.go` outputs the equivalent curl command when `--dry-run` is used. `upload.go` handles S3 presigned-URL uploads with a 500MB limit. `download.go` resolves a download redirect without following it and fetches the presigned URL with no auth headers. `BuildRequestMultiSegment` keeps `/` in named greedy path params (the Files `{path}`), escaping each segment; `BuildRequest` escapes `/` as `%2F`.
@@ -54,6 +62,7 @@ The CLI builds its command tree at startup from a live OpenAPI spec. `internal/s
 | Package | Role |
 |---------|------|
 | `internal/commands` | Cobra command builders — both dynamic (builder.go) and curated (jobs.go, files.go) |
+| `internal/api` | Types and operations generated from the OpenAPI spec for the curated commands |
 | `internal/files` | Wherobots Files drives and file operations used by `files` commands |
 | `internal/spec` | OpenAPI spec fetching, caching, and parsing |
 | `internal/executor` | HTTP request construction, execution, dry-run, file upload and download |
@@ -67,6 +76,6 @@ The CLI builds its command tree at startup from a live OpenAPI spec. `internal/s
 
 ## CI/CD
 
-- **PR validation** (`.github/workflows/pr-validate.yml`): runs `go test` and `go build` on every PR
+- **PR validation** (`.github/workflows/pr-validate.yml`): runs `go test` and `go build` on every PR, and fails if `make generate` changes `internal/api`
 - **Release** (`.github/workflows/release.yml`): on push to main, builds all 6 platform binaries (darwin/linux/windows x amd64/arm64), generates SHA-256 checksums, publishes as rolling `latest-prerelease` GitHub release
 - **Tagged release** (`.github/workflows/tagged-release.yml`): on a `v*` tag push, runs tests, builds the same 6 binaries with the version injected, and publishes a versioned GitHub release (see `RELEASE.md`)

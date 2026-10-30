@@ -1,0 +1,25 @@
+# Operations the hand-written commands call. `make generate` only knows about
+# these. A second field names the schema to decode a response with no single
+# schema of its own.
+
+# job-runs
+createJobRun
+listJobRuns
+getJobRun
+getJobRunLogs
+getJobRunMetrics
+createUploadUrl
+getDirectory
+getIntegrationDirectory
+getNotebookConfigHint
+getMe Customer
+getMyOrganization
+
+# files
+listDirectoryContents
+createDirectory
+deleteDirectory
+createFileUploadUrl
+downloadFileFromStorage
+deleteFileFromStorage
+renameFileInStorage
