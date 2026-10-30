@@ -24,6 +24,7 @@ import (
 	"wherobots/cli/internal/config"
 	"wherobots/cli/internal/executor"
 	"wherobots/cli/internal/files"
+	"wherobots/cli/internal/httpclient"
 	"wherobots/cli/internal/spec"
 )
 
@@ -51,7 +52,7 @@ func addFilesCommands(root *cobra.Command, cfg config.Config, creds executor.Cre
 		runtime: runtimeSpec,
 		client:  client,
 		// Storage transfers have no overall timeout so large files are not cut off.
-		transfer: &http.Client{},
+		transfer: httpclient.New(0),
 		flags:    flags,
 		ops: files.Operations{
 			ListDirectory:   findOperation(runtimeSpec, "GET", "/storage/{storage_id}/directories/{path}"),
