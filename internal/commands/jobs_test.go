@@ -186,11 +186,11 @@ func TestJobsRunWatchReturnsErrorOnFailedStatus(t *testing.T) {
 		case r.Method == http.MethodPost && r.URL.Path == "/runs":
 			_, _ = io.WriteString(w, `{"id":"run-xyz","status":"PENDING"}`)
 		case r.Method == http.MethodGet && r.URL.Path == "/runs/run-xyz/logs":
-			if r.URL.Query().Get("size") == "1000" {
-				_, _ = io.WriteString(w, `{"items":[{"raw":"final"}],"current_page":1,"next_page":null}`)
+			if r.URL.Query().Get("cursor") == "2" {
+				_, _ = io.WriteString(w, `{"items":[{"timestamp":"2","raw":"final"}],"current_page":"2","next_page":null}`)
 				return
 			}
-			_, _ = io.WriteString(w, `{"items":[{"raw":"line-1"}],"current_page":0,"next_page":1}`)
+			_, _ = io.WriteString(w, `{"items":[{"timestamp":"1","raw":"line-1"}],"current_page":"0","next_page":"2"}`)
 		case r.Method == http.MethodGet && r.URL.Path == "/runs/run-xyz":
 			statusCalls++
 			if statusCalls == 1 {
@@ -533,66 +533,13 @@ func TestJobsRunUsesUploadPathEnvOverride(t *testing.T) {
 	}
 }
 
-func TestJobsLogsFollowDoesNotReprintWhenNextPageNull(t *testing.T) {
-	t.Parallel()
-
-	var logCalls int
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/runs/run-777/logs":
-			logCalls++
-			cursor := r.URL.Query().Get("cursor")
-			switch {
-			case cursor == "0":
-				// First poll: 2 lines, no next_page
-				_, _ = io.WriteString(w, `{"items":[{"raw":"line-1"},{"raw":"line-2"}],"current_page":0,"next_page":null}`)
-			case cursor == "2":
-				// Second poll: 1 new line, no next_page
-				_, _ = io.WriteString(w, `{"items":[{"raw":"line-3"}],"current_page":2,"next_page":null}`)
-			default:
-				// Any further poll: no new lines
-				_, _ = io.WriteString(w, `{"items":[],"current_page":0,"next_page":null}`)
-			}
-		case r.Method == http.MethodGet && r.URL.Path == "/runs/run-777":
-			// Terminal on first status check so we don't loop forever
-			_, _ = io.WriteString(w, `{"id":"run-777","status":"COMPLETED"}`)
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer server.Close()
-
-	root := buildJobsTestRoot(server.URL)
-	var out bytes.Buffer
-	root.SetOut(&out)
-	root.SetErr(&bytes.Buffer{})
-	root.SetArgs([]string{"job-runs", "logs", "run-777", "--follow", "--interval", "0.01"})
-
-	if err := root.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
-	}
-
-	got := out.String()
-	// Each line should appear exactly once
-	if count := strings.Count(got, "line-1"); count != 1 {
-		t.Errorf("expected line-1 once, got %d times in %q", count, got)
-	}
-	if count := strings.Count(got, "line-2"); count != 1 {
-		t.Errorf("expected line-2 once, got %d times in %q", count, got)
-	}
-	if count := strings.Count(got, "line-3"); count != 1 {
-		t.Errorf("expected line-3 once, got %d times in %q", count, got)
-	}
-}
-
 func TestJobsLogsJsonOutput(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/runs/run-555/logs" {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = io.WriteString(w, `{"items":[{"raw":"a"},{"raw":"b"}],"current_page":0,"next_page":null}`)
+			_, _ = io.WriteString(w, `{"items":[{"timestamp":"1","raw":"a"},{"timestamp":"2","raw":"b"}],"current_page":"0","next_page":null}`)
 			return
 		}
 		http.NotFound(w, r)

@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 	"text/tabwriter"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
-	"github.com/tidwall/gjson"
 
 	"wherobots/cli/internal/api"
 	"wherobots/cli/internal/config"
@@ -30,6 +30,7 @@ const (
 	defaultRunTimeout  = 3600
 	defaultListLimit   = 20
 	defaultLogsPollSec = 2.0
+	logPageSize        = 500
 
 	outputText = "text"
 	outputJSON = "json"
@@ -1094,34 +1095,10 @@ func (r *jobsRunner) followLogs(cmd *cobra.Command, runID string, intervalSec fl
 	watcher, stop := newInterruptWatcher()
 	defer stop()
 
-	cursor := 0
+	stream := newLogStream(cmd.ErrOrStderr())
 	for {
-		if watcher.Interrupted() {
-			return true, nil
-		}
-
-		respBody, err := r.execWithRetry(cmd.Context(), r.getRunLogs, []string{runID}, []executor.QueryPair{{Key: "cursor", Value: fmt.Sprintf("%d", cursor)}, {Key: "size", Value: "200"}}, "")
-		if err != nil {
-			return false, err
-		}
-		lines, err := extractLogLines(respBody)
-		if err != nil {
-			return false, err
-		}
-		for _, line := range lines {
-			if _, err := fmt.Fprintln(cmd.OutOrStdout(), line); err != nil {
-				return false, err
-			}
-		}
-
-		nextCursor := gjson.GetBytes(respBody, "next_page")
-		if nextCursor.Exists() && nextCursor.Type != gjson.Null {
-			next := int(nextCursor.Int())
-			if next != cursor {
-				cursor = next
-			}
-		} else {
-			cursor += len(lines)
+		if detached, err := r.printNewLogs(cmd, runID, stream, watcher); detached || err != nil {
+			return detached, err
 		}
 
 		runBody, err := r.execWithRetry(cmd.Context(), r.getRun, []string{runID}, nil, "")
@@ -1136,24 +1113,44 @@ func (r *jobsRunner) followLogs(cmd *cobra.Command, runID string, intervalSec fl
 			if phase == runPhaseUnknown {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Stopped following: this CLI does not recognize run status %q. Run 'wherobots upgrade' to get a newer version.\n", run.Status)
 			}
-			finalBody, err := r.execWithRetry(cmd.Context(), r.getRunLogs, []string{runID}, []executor.QueryPair{{Key: "cursor", Value: fmt.Sprintf("%d", cursor)}, {Key: "size", Value: "1000"}}, "")
-			if err != nil {
-				return false, err
-			}
-			finalLines, err := extractLogLines(finalBody)
-			if err != nil {
-				return false, err
-			}
-			for _, line := range finalLines {
-				if _, err := fmt.Fprintln(cmd.OutOrStdout(), line); err != nil {
-					return false, err
-				}
-			}
-			return false, nil
+			// Lines can land between the last read and the status check.
+			return r.printNewLogs(cmd, runID, stream, watcher)
 		}
 
 		if interrupted := sleepWithInterrupt(watcher, time.Duration(intervalSec*float64(time.Second))); interrupted {
 			return true, nil
+		}
+	}
+}
+
+// printNewLogs reads until next_page is null, which is the end of the logs so
+// far. It reports true when interrupted.
+func (r *jobsRunner) printNewLogs(cmd *cobra.Command, runID string, stream *logStream, watcher *interruptWatcher) (bool, error) {
+	for {
+		if watcher.Interrupted() {
+			return true, nil
+		}
+		cursor := strconv.FormatInt(stream.cursor, 10)
+		query := executor.QueryParams(api.GetJobRunLogsParams{Cursor: &cursor, Size: api.Ptr(logPageSize)})
+		respBody, err := r.execWithRetry(cmd.Context(), r.getRunLogs, []string{runID}, query, "")
+		if err != nil {
+			return false, err
+		}
+		page, err := api.GetJobRunLogs.Decode(respBody)
+		if err != nil {
+			return false, fmt.Errorf("decode run logs: %w", err)
+		}
+		lines, more, err := stream.next(page)
+		if err != nil {
+			return false, err
+		}
+		for _, line := range lines {
+			if _, err := fmt.Fprintln(cmd.OutOrStdout(), line); err != nil {
+				return false, err
+			}
+		}
+		if !more {
+			return false, nil
 		}
 	}
 }
