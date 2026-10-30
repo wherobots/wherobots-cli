@@ -35,10 +35,27 @@ const (
 	outputJSON = "json"
 )
 
-var terminalStatuses = map[string]struct{}{
-	"COMPLETED": {},
-	"FAILED":    {},
-	"CANCELLED": {},
+type runPhase int
+
+const (
+	runPhaseUnknown runPhase = iota
+	runPhaseActive
+	runPhaseSucceeded
+	runPhaseFailed
+)
+
+// classifyRun sorts run statuses. A status newer than this build is unknown:
+// followers stop instead of waiting on a status that may never change.
+func classifyRun(status api.RunStatus) runPhase {
+	switch status {
+	case api.RunStatusPENDING, api.RunStatusRUNNING:
+		return runPhaseActive
+	case api.RunStatusCOMPLETED:
+		return runPhaseSucceeded
+	case api.RunStatusFAILED, api.RunStatusCANCELLED, api.RunStatusTIMEDOUT:
+		return runPhaseFailed
+	}
+	return runPhaseUnknown
 }
 
 type jobsRunner struct {
@@ -287,7 +304,10 @@ func (r *jobsRunner) newCreateCommand() *cobra.Command {
 				return fmt.Errorf("decode run: %w", err)
 			}
 			finalStatus := finalRun.Status
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "\nRun finished: %s\n", finalStatus)
+			phase := classifyRun(finalStatus)
+			if phase != runPhaseUnknown {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "\nRun finished: %s\n", finalStatus)
+			}
 
 			if output == outputJSON {
 				_, err = fmt.Fprintln(cmd.OutOrStdout(), string(finalBody))
@@ -296,10 +316,13 @@ func (r *jobsRunner) newCreateCommand() *cobra.Command {
 				}
 			}
 
-			if finalStatus == api.RunStatusFAILED || finalStatus == api.RunStatusCANCELLED {
-				return fmt.Errorf("run finished with status %s", finalStatus)
+			switch phase {
+			case runPhaseSucceeded:
+				return nil
+			case runPhaseUnknown:
+				return fmt.Errorf("stopped watching at unrecognized status %s; the run may still be active", finalStatus)
 			}
-			return nil
+			return fmt.Errorf("run finished with status %s", finalStatus)
 		},
 	}
 
@@ -1105,8 +1128,14 @@ func (r *jobsRunner) followLogs(cmd *cobra.Command, runID string, intervalSec fl
 		if err != nil {
 			return false, err
 		}
-		status := strings.ToUpper(strings.TrimSpace(gjson.GetBytes(runBody, "status").String()))
-		if _, terminal := terminalStatuses[status]; terminal {
+		run, err := api.GetJobRun.Decode(runBody)
+		if err != nil {
+			return false, fmt.Errorf("decode run: %w", err)
+		}
+		if phase := classifyRun(run.Status); phase != runPhaseActive {
+			if phase == runPhaseUnknown {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Stopped following: this CLI does not recognize run status %q. Run 'wherobots upgrade' to get a newer version.\n", run.Status)
+			}
 			finalBody, err := r.execWithRetry(cmd.Context(), r.getRunLogs, []string{runID}, []executor.QueryPair{{Key: "cursor", Value: fmt.Sprintf("%d", cursor)}, {Key: "size", Value: "1000"}}, "")
 			if err != nil {
 				return false, err
