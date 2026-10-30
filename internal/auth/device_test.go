@@ -284,6 +284,31 @@ func TestPollForTokenGivesUpAfterConsecutiveFailures(t *testing.T) {
 	}
 }
 
+func TestPollForTokenStopsOnRefusedRedirect(t *testing.T) {
+	t.Parallel()
+	var tokenCalls atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth2/token", func(w http.ResponseWriter, r *http.Request) {
+		tokenCalls.Add(1)
+		http.Redirect(w, r, "/target", http.StatusFound)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	client := NewResolver(config.Config{OAuthDomain: srv.URL, HTTPTimeout: time.Second}).OAuthClient()
+	client.sleep = func(ctx context.Context, _ time.Duration) error { return ctx.Err() }
+
+	_, err := client.PollForToken(context.Background(), &DeviceAuthorization{DeviceCode: "d", Interval: 5, ExpiresIn: 299})
+
+	var refused *httpclient.RefusedRedirectError
+	if !errors.As(err, &refused) {
+		t.Fatalf("PollForToken() error = %v, want a refused redirect", err)
+	}
+	if got := tokenCalls.Load(); got != 1 {
+		t.Errorf("token calls = %d, want 1", got)
+	}
+}
+
 func TestRefreshRotatesToken(t *testing.T) {
 	t.Parallel()
 	m := newMockAuthKit(t, []mockResponse{

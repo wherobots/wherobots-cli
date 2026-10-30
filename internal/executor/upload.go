@@ -3,14 +3,11 @@ package executor
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
-
-	"wherobots/cli/internal/httpclient"
 )
 
 const maxAutoUploadSizeBytes = 500 * 1024 * 1024
@@ -55,12 +52,7 @@ func UploadFileToPresignedURL(ctx context.Context, client *http.Client, uploadUR
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		// The wrapping url.Error names the Location, which can be presigned.
-		var refused *httpclient.RefusedRedirectError
-		if errors.As(err, &refused) {
-			return refused
-		}
-		return fmt.Errorf("upload request failed: %w", err)
+		return fmt.Errorf("upload request failed: %w", withoutURL(err))
 	}
 	defer resp.Body.Close()
 
