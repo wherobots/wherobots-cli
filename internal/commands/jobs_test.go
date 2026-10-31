@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"wherobots/cli/internal/api"
 	"wherobots/cli/internal/auth"
 	"wherobots/cli/internal/config"
 	"wherobots/cli/internal/spec"
@@ -36,7 +38,7 @@ func TestJobsRunNoWatchPrintsSummary(t *testing.T) {
 			_, _ = io.WriteString(w, `{"name":"root","path":"s3://managed-bucket/customer/root"}`)
 		case r.Method == http.MethodPost && r.URL.Path == "/runs":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = io.WriteString(w, `{"id":"run-123","name":"test-job-001","status":"PENDING","createTime":"2026-01-01T00:00:00Z","payload":{"runtime":"tiny","region":"aws-us-west-2"}}`)
+			_, _ = io.WriteString(w, `{"id":"run-123","name":"test-job-001","status":"PENDING","createTime":"2026-01-01T00:00:00Z","payload":{"runtime":"tiny"},"kubeApp":{"regionName":"aws-us-west-2"}}`)
 		default:
 			http.NotFound(w, r)
 		}
@@ -184,11 +186,11 @@ func TestJobsRunWatchReturnsErrorOnFailedStatus(t *testing.T) {
 		case r.Method == http.MethodPost && r.URL.Path == "/runs":
 			_, _ = io.WriteString(w, `{"id":"run-xyz","status":"PENDING"}`)
 		case r.Method == http.MethodGet && r.URL.Path == "/runs/run-xyz/logs":
-			if r.URL.Query().Get("size") == "1000" {
-				_, _ = io.WriteString(w, `{"items":[{"raw":"final"}],"current_page":1,"next_page":null}`)
+			if r.URL.Query().Get("cursor") == "2" {
+				_, _ = io.WriteString(w, `{"items":[{"timestamp":"2","raw":"final"}],"current_page":"2","next_page":null}`)
 				return
 			}
-			_, _ = io.WriteString(w, `{"items":[{"raw":"line-1"}],"current_page":0,"next_page":1}`)
+			_, _ = io.WriteString(w, `{"items":[{"timestamp":"1","raw":"line-1"}],"current_page":"0","next_page":"2"}`)
 		case r.Method == http.MethodGet && r.URL.Path == "/runs/run-xyz":
 			statusCalls++
 			if statusCalls == 1 {
@@ -531,66 +533,13 @@ func TestJobsRunUsesUploadPathEnvOverride(t *testing.T) {
 	}
 }
 
-func TestJobsLogsFollowDoesNotReprintWhenNextPageNull(t *testing.T) {
-	t.Parallel()
-
-	var logCalls int
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/runs/run-777/logs":
-			logCalls++
-			cursor := r.URL.Query().Get("cursor")
-			switch {
-			case cursor == "0":
-				// First poll: 2 lines, no next_page
-				_, _ = io.WriteString(w, `{"items":[{"raw":"line-1"},{"raw":"line-2"}],"current_page":0,"next_page":null}`)
-			case cursor == "2":
-				// Second poll: 1 new line, no next_page
-				_, _ = io.WriteString(w, `{"items":[{"raw":"line-3"}],"current_page":2,"next_page":null}`)
-			default:
-				// Any further poll: no new lines
-				_, _ = io.WriteString(w, `{"items":[],"current_page":0,"next_page":null}`)
-			}
-		case r.Method == http.MethodGet && r.URL.Path == "/runs/run-777":
-			// Terminal on first status check so we don't loop forever
-			_, _ = io.WriteString(w, `{"id":"run-777","status":"COMPLETED"}`)
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer server.Close()
-
-	root := buildJobsTestRoot(server.URL)
-	var out bytes.Buffer
-	root.SetOut(&out)
-	root.SetErr(&bytes.Buffer{})
-	root.SetArgs([]string{"job-runs", "logs", "run-777", "--follow", "--interval", "0.01"})
-
-	if err := root.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
-	}
-
-	got := out.String()
-	// Each line should appear exactly once
-	if count := strings.Count(got, "line-1"); count != 1 {
-		t.Errorf("expected line-1 once, got %d times in %q", count, got)
-	}
-	if count := strings.Count(got, "line-2"); count != 1 {
-		t.Errorf("expected line-2 once, got %d times in %q", count, got)
-	}
-	if count := strings.Count(got, "line-3"); count != 1 {
-		t.Errorf("expected line-3 once, got %d times in %q", count, got)
-	}
-}
-
 func TestJobsLogsJsonOutput(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/runs/run-555/logs" {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = io.WriteString(w, `{"items":[{"raw":"a"},{"raw":"b"}],"current_page":0,"next_page":null}`)
+			_, _ = io.WriteString(w, `{"items":[{"timestamp":"1","raw":"a"},{"timestamp":"2","raw":"b"}],"current_page":"0","next_page":null}`)
 			return
 		}
 		http.NotFound(w, r)
@@ -619,7 +568,7 @@ func TestJobsListDefaultsToText(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/runs" {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = io.WriteString(w, `{"items":[{"id":"run-1","name":"a","status":"RUNNING","createTime":"2026-01-01T00:00:00Z","payload":{"runtime":"tiny","region":"aws-us-west-2"}}],"total":1,"next_page":null}`)
+			_, _ = io.WriteString(w, `{"items":[{"id":"run-1","name":"a","status":"RUNNING","createTime":"2026-01-01T00:00:00Z","payload":{"runtime":"tiny"},"kubeApp":{"regionName":"aws-us-west-2"}}],"total":1,"next_page":null}`)
 			return
 		}
 		http.NotFound(w, r)
@@ -639,6 +588,9 @@ func TestJobsListDefaultsToText(t *testing.T) {
 	got := out.String()
 	if !strings.Contains(got, "ID") || !strings.Contains(got, "run-1") {
 		t.Fatalf("expected text table output by default, got %q", got)
+	}
+	if !strings.Contains(got, "aws-us-west-2") {
+		t.Fatalf("expected the run's region, got %q", got)
 	}
 	if gjsonValid(strings.TrimSpace(got)) {
 		t.Fatalf("expected text output by default, got JSON: %q", got)
@@ -751,6 +703,30 @@ func TestApiSubtreeEmitsDottedResourceCommandInClientHeader(t *testing.T) {
 	}
 }
 
+func TestJobsListSendsEveryStatus(t *testing.T) {
+	t.Parallel()
+
+	var got []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.URL.Query()["status"]
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"items":[],"total":0,"next_page":null}`)
+	}))
+	defer server.Close()
+
+	root := buildJobsTestRoot(server.URL)
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"job-runs", "list", "--status", "running", "--status", "FAILED"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if !equalStrings(got, []string{"RUNNING", "FAILED"}) {
+		t.Fatalf("expected both statuses, got %v", got)
+	}
+}
+
 func TestJobsRunningAliasFiltersStatus(t *testing.T) {
 	t.Parallel()
 
@@ -825,6 +801,9 @@ func TestJobsMetricsTextOutput(t *testing.T) {
 	}
 	if !strings.Contains(got, "Consumed Spatial Units") || !strings.Contains(got, "150") {
 		t.Fatalf("expected Consumed Spatial Units as number, got %q", got)
+	}
+	if cpu, consumed, cost := strings.Index(got, "CPU"), strings.Index(got, "Consumed"), strings.Index(got, "Cost"); cpu > consumed || consumed > cost {
+		t.Fatalf("expected metrics sorted by name, got %q", got)
 	}
 }
 
@@ -919,7 +898,7 @@ func TestFormatMetricValue(t *testing.T) {
 
 	tests := []struct {
 		value    float64
-		format   string
+		format   api.DataFormat
 		expected string
 	}{
 		{45.2, "PERCENTAGE", "45.2%"},
@@ -1002,6 +981,68 @@ func TestJobsListDryRunSkipsRequest(t *testing.T) {
 	got := strings.TrimSpace(out.String())
 	if !strings.HasPrefix(got, "curl -X GET '"+server.URL+"/runs") {
 		t.Fatalf("expected curl GET %s/runs, got %q", server.URL, got)
+	}
+}
+
+func TestBuildRunPayloadWireFormat(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name, script, jarMainClass, want string
+	}{
+		{
+			name:   "python with environment",
+			script: "s3://bucket/job.py",
+			want: `{"name":"test-job-001","runPython":{"args":["--day","1"],"uri":"s3://bucket/job.py"},"runtime":"tiny","timeoutSeconds":60,
+				"environment":{"dependencies":[{"libraryName":"numpy","libraryVersion":"2.0","sourceType":"PYPI"},{"filePath":"s3://bucket/lib.whl","sourceType":"FILE"}],"sparkConfigs":{"spark.a":"b"}}}`,
+		},
+		{
+			name:         "jar",
+			script:       "s3://bucket/job.jar",
+			jarMainClass: "com.Main",
+			want: `{"name":"test-job-001","runJar":{"args":["--day","1"],"mainClass":"com.Main","uri":"s3://bucket/job.jar"},"runtime":"tiny","timeoutSeconds":60,
+				"environment":{"dependencies":[{"libraryName":"numpy","libraryVersion":"2.0","sourceType":"PYPI"},{"filePath":"s3://bucket/lib.whl","sourceType":"FILE"}],"sparkConfigs":{"spark.a":"b"}}}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			payload, err := buildRunPayload(tt.script, "test-job-001", "tiny", 60, "--day 1", []string{"spark.a=b"}, []string{"numpy==2.0"}, []string{"s3://bucket/lib.whl"}, tt.jarMainClass)
+			if err != nil {
+				t.Fatalf("buildRunPayload() error = %v", err)
+			}
+			encoded, err := json.Marshal(payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got, want any
+			if err := json.Unmarshal(encoded, &got); err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal([]byte(tt.want), &want); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("payload = %s, want %s", encoded, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildRunPayloadOmitsEmptyOptionalFields(t *testing.T) {
+	t.Parallel()
+
+	payload, err := buildRunPayload("s3://bucket/job.py", "test-job-001", "", 60, "", nil, nil, nil, "")
+	if err != nil {
+		t.Fatalf("buildRunPayload() error = %v", err)
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"name":"test-job-001","runPython":{"args":[],"uri":"s3://bucket/job.py"},"timeoutSeconds":60}`
+	if string(encoded) != want {
+		t.Fatalf("payload = %s, want %s", encoded, want)
 	}
 }
 

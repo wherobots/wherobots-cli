@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"wherobots/cli/internal/api"
 	"wherobots/cli/internal/auth"
 	"wherobots/cli/internal/config"
 	"wherobots/cli/internal/spec"
@@ -613,5 +615,34 @@ func TestBuildRequestMultiSegmentOnlyKeepsSlashesInNamedParams(t *testing.T) {
 	}
 	if got, want := req.URL.String(), "https://api.example.com/storage/a%2Fb/files/c/d"; got != want {
 		t.Fatalf("url = %s, want %s", got, want)
+	}
+}
+
+func TestQueryParamsFollowsFormTags(t *testing.T) {
+	t.Parallel()
+
+	statuses := []api.RunStatus{api.RunStatusRUNNING, api.RunStatusTIMEDOUT}
+	got := QueryParams(api.ListJobRunsParams{
+		CreatedAfter: api.Ptr("2026-01-01"),
+		Status:       &statuses,
+		Size:         api.Ptr(5),
+	})
+	want := []QueryPair{
+		{Key: "created_after", Value: "2026-01-01"},
+		{Key: "status", Value: "RUNNING"},
+		{Key: "status", Value: "TIMED_OUT"},
+		{Key: "size", Value: "5"},
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("QueryParams() = %v, want %v", got, want)
+	}
+}
+
+func TestQueryParamsSendsRequiredValuesEvenWhenEmpty(t *testing.T) {
+	t.Parallel()
+
+	got := QueryParams(api.GetDirectoryParams{})
+	if want := []QueryPair{{Key: "dir", Value: ""}}; !slices.Equal(got, want) {
+		t.Fatalf("QueryParams() = %v, want %v", got, want)
 	}
 }
