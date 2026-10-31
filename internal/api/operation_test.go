@@ -21,3 +21,11 @@ func TestDecodeRejectsInvalidJSON(t *testing.T) {
 		t.Fatal("expected an error for a non-JSON body")
 	}
 }
+
+func TestDecodeStrictRejectsAPageCursorThatChangesType(t *testing.T) {
+	t.Parallel()
+
+	if _, err := GetJobRunLogs.DecodeStrict([]byte(`{"items":[],"current_page":"1","next_page":2}`)); err == nil {
+		t.Fatal("expected an error")
+	}
+}

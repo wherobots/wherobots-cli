@@ -297,7 +297,7 @@ func (c *DriveClient) rootMissing(ctx context.Context) bool {
 // is empty on the last page. It drops the folder's own marker (an item with an
 // empty name), so a listing never shows it as a nameless folder.
 func parseListing(body []byte) ([]Entry, string, error) {
-	page, err := api.ListDirectoryContents.Decode(body)
+	page, err := api.ListDirectoryContents.DecodeStrict(body)
 	if err != nil {
 		return nil, "", fmt.Errorf("decode directory listing: %w", err)
 	}

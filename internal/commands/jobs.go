@@ -1136,7 +1136,7 @@ func (r *jobsRunner) printNewLogs(cmd *cobra.Command, runID string, stream *logS
 		if err != nil {
 			return false, err
 		}
-		page, err := api.GetJobRunLogs.Decode(respBody)
+		page, err := api.GetJobRunLogs.DecodeStrict(respBody)
 		if err != nil {
 			return false, fmt.Errorf("decode run logs: %w", err)
 		}

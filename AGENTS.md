@@ -47,7 +47,7 @@ The CLI builds its command tree at startup from a live OpenAPI spec. `internal/s
 
 The curated commands use types from `internal/api`, never hand-written paths, JSON field names, or enum values. `operations.txt` lists the operationIds they call. To call another operation, add it there and run `make update-spec`. `tools/apigen`, a separate module so the generator stays out of the CLI's dependencies, filters the prod spec to those operations and the schemas they reach (`openapi.snapshot.json`), then runs oapi-codegen for models only (`api.gen.go`). `make generate` works offline from the snapshot and CI fails if its output differs from what is committed.
 
-The executor still sends every request: `api.GetJobRun.Method`/`.Path` find the runtime spec operation, `api.GetJobRun.Decode` parses the response, and `executor.QueryParams` turns a generated `...Params` struct into query pairs. A new `RunStatus` must be classified in `classifyRun`; a test fails until it is.
+The executor still sends every request: `api.GetJobRun.Method`/`.Path` find the runtime spec operation, `api.GetJobRun.Decode` parses the response (`DecodeStrict` where a lost field would end a read early), and `executor.QueryParams` turns a generated `...Params` struct into query pairs. A new `RunStatus` must be classified in `classifyRun`; a test fails until it is.
 
 ### Request Execution Pipeline
 
