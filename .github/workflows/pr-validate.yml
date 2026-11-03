@@ -25,3 +25,14 @@ jobs:
 
       - name: Verify build
         run: go build ./...
+
+      - name: Test the API generator
+        working-directory: tools/apigen
+        run: go test ./...
+
+      - name: Check generated API code
+        run: |
+          make generate
+          git status --porcelain
+          git diff --exit-code
+          test -z "$(git status --porcelain)"

@@ -1,0 +1,17 @@
+{{range .}}{{$opid := .OperationId}}
+{{range .Bodies}}
+{{if .IsSupported -}}
+{{$contentType := .ContentType -}}
+{{with .TypeDef $opid}}
+// {{.TypeName}} defines body for {{$opid}} for {{$contentType}} ContentType.
+type {{.TypeName}} {{if .IsAlias}}={{end}} {{.Schema.TypeDecl}}
+{{end}}
+{{end}}
+{{end}}
+{{end}}
+// Operations the hand-written commands call. See operations.txt.
+var (
+{{- range .}}
+	{{.OperationId}} = Operation[{{responseType .}}]{Method: "{{.Method}}", Path: "{{.Path}}"}
+{{- end}}
+)

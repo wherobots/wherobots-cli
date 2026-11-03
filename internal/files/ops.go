@@ -10,8 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/tidwall/gjson"
-
+	"wherobots/cli/internal/api"
 	"wherobots/cli/internal/executor"
 	"wherobots/cli/internal/spec"
 )
@@ -26,13 +25,13 @@ const maxListPages = 10000
 // Operations are the seven /storage file-plane routes, found in the runtime
 // spec by the caller.
 type Operations struct {
-	ListDirectory   *spec.Operation // GET    /storage/{storage_id}/directories/{path}
-	CreateDirectory *spec.Operation // PUT    /storage/{storage_id}/directories/{path}
-	DeleteDirectory *spec.Operation // DELETE /storage/{storage_id}/directories/{path}
-	CreateUploadURL *spec.Operation // POST   /storage/{storage_id}/file-upload-url/{path}
-	DownloadFile    *spec.Operation // GET    /storage/{storage_id}/files/{path}
-	DeleteFile      *spec.Operation // DELETE /storage/{storage_id}/files/{path}
-	RenameFile      *spec.Operation // POST   /storage/{storage_id}/file-rename/{path}
+	ListDirectory   *spec.Operation
+	CreateDirectory *spec.Operation
+	DeleteDirectory *spec.Operation
+	CreateUploadURL *spec.Operation
+	DownloadFile    *spec.Operation
+	DeleteFile      *spec.Operation
+	RenameFile      *spec.Operation
 }
 
 // Complete reports whether every route was found.
@@ -72,16 +71,16 @@ func (s *Service) Open(d Drive) (*DriveClient, error) {
 
 // Entry is one file or folder in a listing, using the API's field names.
 type Entry struct {
-	Name         string `json:"name"`
-	Path         string `json:"path"`
-	Type         string `json:"type"`
-	Size         int64  `json:"size"`
-	LastModified string `json:"lastModified,omitempty"`
+	Name         string            `json:"name"`
+	Path         string            `json:"path"`
+	Type         api.FileEntryType `json:"type"`
+	Size         int64             `json:"size"`
+	LastModified string            `json:"lastModified,omitempty"`
 }
 
 // IsFolder reports whether the entry is a folder.
 func (e Entry) IsFolder() bool {
-	return strings.EqualFold(e.Type, "FOLDER")
+	return e.Type == api.FileEntryTypeFOLDER
 }
 
 // NotSignedInError is a 401 from the API.
@@ -285,7 +284,7 @@ func (c *DriveClient) mapError(ctx context.Context, err error, displayPath strin
 
 // rootMissing lists the drive root once; only a 404 counts as missing.
 func (c *DriveClient) rootMissing(ctx context.Context) bool {
-	req, err := c.build(ctx, c.svc.Ops.ListDirectory, "", []executor.QueryPair{{Key: "limit", Value: "1"}})
+	req, err := c.build(ctx, c.svc.Ops.ListDirectory, "", executor.QueryParams(api.ListDirectoryContentsParams{Limit: api.Ptr(1)}))
 	if err != nil {
 		return false
 	}
@@ -294,25 +293,33 @@ func (c *DriveClient) rootMissing(ctx context.Context) bool {
 	return errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound
 }
 
-// parseEntries drops the folder's own marker (an item with an empty name),
-// so a listing never shows it as a nameless folder.
-func parseEntries(body []byte) []Entry {
+// parseListing reads one page of a listing and the cursor of the next, which
+// is empty on the last page. It drops the folder's own marker (an item with an
+// empty name), so a listing never shows it as a nameless folder.
+func parseListing(body []byte) ([]Entry, string, error) {
+	page, err := api.ListDirectoryContents.DecodeStrict(body)
+	if err != nil {
+		return nil, "", fmt.Errorf("decode directory listing: %w", err)
+	}
 	var entries []Entry
-	gjson.GetBytes(body, "items").ForEach(func(_, item gjson.Result) bool {
-		name := item.Get("name").String()
-		if strings.Trim(name, "/") == "" {
-			return true
+	for _, item := range page.Items {
+		if strings.Trim(item.Name, "/") == "" {
+			continue
 		}
-		entries = append(entries, Entry{
-			Name:         name,
-			Path:         item.Get("path").String(),
-			Type:         item.Get("type").String(),
-			Size:         item.Get("size").Int(),
-			LastModified: item.Get("lastModified").String(),
-		})
-		return true
-	})
-	return entries
+		entry := Entry{Name: item.Name, Path: item.Path, Type: item.Type}
+		if item.Size != nil {
+			entry.Size = int64(*item.Size)
+		}
+		if item.LastModified != nil {
+			entry.LastModified = *item.LastModified
+		}
+		entries = append(entries, entry)
+	}
+	var next string
+	if page.NextPage != nil {
+		next = strings.TrimSpace(*page.NextPage)
+	}
+	return entries, next, nil
 }
 
 // ---- operations ----
@@ -329,20 +336,23 @@ func (c *DriveClient) List(ctx context.Context, remote string) ([]Entry, error) 
 	entries := []Entry{}
 	cursor := ""
 	for page := 0; page < maxListPages; page++ {
-		query := []executor.QueryPair{{Key: "limit", Value: fmt.Sprintf("%d", listPageLimit)}}
+		params := api.ListDirectoryContentsParams{Limit: api.Ptr(listPageLimit)}
 		if cursor != "" {
-			query = append(query, executor.QueryPair{Key: "cursor", Value: cursor})
+			params.Cursor = &cursor
 		}
-		body, err := c.send(ctx, c.svc.Ops.ListDirectory, folder, query)
+		body, err := c.send(ctx, c.svc.Ops.ListDirectory, folder, executor.QueryParams(params))
 		if err != nil {
 			return nil, c.mapError(ctx, err, folder)
 		}
 		if c.dryRun() {
 			return nil, nil
 		}
-		entries = append(entries, parseEntries(body)...)
+		page, next, err := parseListing(body)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, page...)
 
-		next := strings.TrimSpace(gjson.GetBytes(body, "next_page").String())
 		if next == "" {
 			return entries, nil
 		}
@@ -434,7 +444,11 @@ func (c *DriveClient) Upload(ctx context.Context, remote, localPath string) (str
 	if c.dryRun() {
 		return target, nil
 	}
-	uploadURL := strings.TrimSpace(gjson.GetBytes(body, "uploadUrl").String())
+	upload, err := api.CreateFileUploadURL.Decode(body)
+	if err != nil {
+		return "", fmt.Errorf("decode upload URL response: %w", err)
+	}
+	uploadURL := strings.TrimSpace(upload.UploadURL)
 	if uploadURL == "" {
 		return "", fmt.Errorf("upload URL response is missing uploadUrl")
 	}
@@ -494,7 +508,7 @@ func (c *DriveClient) Rename(ctx context.Context, remote, newName string) error 
 		return err
 	}
 	target := p.filePath()
-	_, err = c.send(ctx, c.svc.Ops.RenameFile, target, []executor.QueryPair{{Key: "new_name", Value: newName}})
+	_, err = c.send(ctx, c.svc.Ops.RenameFile, target, executor.QueryParams(api.RenameFileInStorageParams{NewName: newName}))
 	if err != nil {
 		return c.mapError(ctx, err, target)
 	}
@@ -544,7 +558,7 @@ func (c *DriveClient) DeleteDir(ctx context.Context, remote string, recursive bo
 	folder := p.folderPath()
 
 	if !recursive {
-		body, err := c.send(ctx, c.svc.Ops.ListDirectory, folder, []executor.QueryPair{{Key: "limit", Value: "1"}})
+		body, err := c.send(ctx, c.svc.Ops.ListDirectory, folder, executor.QueryParams(api.ListDirectoryContentsParams{Limit: api.Ptr(1)}))
 		if err != nil {
 			return c.mapError(ctx, err, folder)
 		}
@@ -553,11 +567,12 @@ func (c *DriveClient) DeleteDir(ctx context.Context, remote string, recursive bo
 				return err
 			}
 		} else {
-			// A further page means more entries than the marker, so it is not empty.
-			if strings.TrimSpace(gjson.GetBytes(body, "next_page").String()) != "" {
-				return &FolderNotEmptyError{Path: folder}
+			entries, next, err := parseListing(body)
+			if err != nil {
+				return err
 			}
-			if len(parseEntries(body)) > 0 {
+			// A further page means more entries than the marker, so it is not empty.
+			if next != "" || len(entries) > 0 {
 				return &FolderNotEmptyError{Path: folder}
 			}
 		}

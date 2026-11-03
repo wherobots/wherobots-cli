@@ -1,0 +1,4694 @@
+{
+  "components": {
+    "schemas": {
+      "AppStatus": {
+        "enum": [
+          "PENDING",
+          "PREPARING",
+          "PREPARE_FAILED",
+          "REQUESTED",
+          "DEPLOYING",
+          "DEPLOY_FAILED",
+          "DEPLOYED",
+          "INITIALIZING",
+          "INIT_FAILED",
+          "READY",
+          "DESTROY_REQUESTED",
+          "DESTROYING",
+          "DESTROY_FAILED",
+          "DESTROYED"
+        ],
+        "title": "AppStatus",
+        "type": "string"
+      },
+      "AppType": {
+        "enum": [
+          "JUPYTER",
+          "SQL_SESSION",
+          "RUN"
+        ],
+        "title": "AppType",
+        "type": "string"
+      },
+      "ComputeClusterAvailability": {
+        "enum": [
+          "AVAILABLE",
+          "DEGRADED",
+          "UNAVAILABLE",
+          "DISABLED"
+        ],
+        "title": "ComputeClusterAvailability",
+        "type": "string"
+      },
+      "CreateRunPayload-Input": {
+        "properties": {
+          "environment": {
+            "$ref": "#/components/schemas/RunEnvironment-Input",
+            "default": {
+              "dependencies": [],
+              "sparkConfigs": {}
+            }
+          },
+          "name": {
+            "maxLength": 255,
+            "minLength": 8,
+            "pattern": "^[a-zA-Z0-9_\\-\\.]+$",
+            "title": "Name",
+            "type": "string"
+          },
+          "runJar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunJarPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "runPython": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunPythonPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "runtime": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuntimeId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timeoutSeconds": {
+            "default": 3600,
+            "title": "Timeoutseconds",
+            "type": "integer"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateRunPayload",
+        "type": "object"
+      },
+      "CreateRunPayload-Output": {
+        "properties": {
+          "environment": {
+            "$ref": "#/components/schemas/RunEnvironment-Output",
+            "default": {
+              "dependencies": [],
+              "sparkConfigs": {}
+            }
+          },
+          "name": {
+            "maxLength": 255,
+            "minLength": 8,
+            "pattern": "^[a-zA-Z0-9_\\-\\.]+$",
+            "title": "Name",
+            "type": "string"
+          },
+          "runJar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunJarPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "runPython": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunPythonPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "runtime": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuntimeId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timeoutSeconds": {
+            "default": 3600,
+            "title": "Timeoutseconds",
+            "type": "integer"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateRunPayload",
+        "type": "object"
+      },
+      "CursorPage__T_Customized_RunView_": {
+        "properties": {
+          "current_page": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor to refetch the current page",
+            "title": "Current Page"
+          },
+          "current_page_backwards": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor to refetch the current page starting from the last item",
+            "title": "Current Page Backwards"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RunView"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_page": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page",
+            "title": "Next Page"
+          },
+          "previous_page": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the previous page",
+            "title": "Previous Page"
+          },
+          "total": {
+            "minimum": 0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "CursorPage[~T]Customized[RunView]",
+        "type": "object"
+      },
+      "Customer": {
+        "properties": {
+          "createTime": {
+            "format": "date-time",
+            "title": "Createtime",
+            "type": "string"
+          },
+          "deletedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deletedat"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "organizationId": {
+            "title": "Organizationid",
+            "type": "string"
+          },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/Policy"
+            },
+            "title": "Policies",
+            "type": "array"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "updateTime": {
+            "format": "date-time",
+            "title": "Updatetime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "createTime",
+          "updateTime",
+          "organizationId",
+          "roles",
+          "policies"
+        ],
+        "title": "Customer",
+        "type": "object"
+      },
+      "DataFormat": {
+        "enum": [
+          "NUMBER",
+          "PERCENTAGE",
+          "BYTES",
+          "CURRENCY"
+        ],
+        "title": "DataFormat",
+        "type": "string"
+      },
+      "DataValue": {
+        "properties": {
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value",
+          "timestamp"
+        ],
+        "title": "DataValue",
+        "type": "object"
+      },
+      "DependencyFileType": {
+        "description": "Enum for the file type of dependency",
+        "enum": [
+          "JAR",
+          "PYTHON_WHEEL",
+          "ZIP",
+          "OTHER"
+        ],
+        "title": "DependencyFileType",
+        "type": "string"
+      },
+      "DependencySourceType": {
+        "description": "Enum for the source type of dependency",
+        "enum": [
+          "PYPI",
+          "FILE"
+        ],
+        "title": "DependencySourceType",
+        "type": "string"
+      },
+      "Directory": {
+        "properties": {
+          "files": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/FileEntry"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "mutateProtected": {
+            "default": false,
+            "title": "Mutateprotected",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "uploadProtected": {
+            "default": false,
+            "title": "Uploadprotected",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "path"
+        ],
+        "title": "Directory",
+        "type": "object"
+      },
+      "DirectoryListingResult": {
+        "description": "Result of a directory listing operation.",
+        "properties": {
+          "current_page": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Page"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FileEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "mutate_protected": {
+            "default": false,
+            "title": "Mutate Protected",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_page": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Page"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "upload_protected": {
+            "default": false,
+            "title": "Upload Protected",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "path",
+          "name"
+        ],
+        "title": "DirectoryListingResult",
+        "type": "object"
+      },
+      "Effect": {
+        "enum": [
+          "ALLOW",
+          "DENY"
+        ],
+        "title": "Effect",
+        "type": "string"
+      },
+      "ErrorBody": {
+        "properties": {
+          "errors": {
+            "description": "A list of errors that occurred",
+            "items": {
+              "$ref": "#/components/schemas/ErrorInfo"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "requestId": {
+            "description": "A unique identifier for the request that caused the error",
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "errors",
+          "requestId"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorClass": {
+        "enum": [
+          "BAD_REQUEST_ERROR",
+          "CONFLICT_ERROR",
+          "INVALID_INPUT_ERROR",
+          "INTERNAL_SERVER_ERROR",
+          "UNAUTHORIZED_ERROR",
+          "INSUFFICIENT_PERMISSIONS_ERROR",
+          "THIRD_PARTY_PERMISSIONS_ERROR",
+          "NOT_FOUND_ERROR",
+          "INSUFFICIENT_QUOTA_ERROR",
+          "REQUEST_ENTITY_TOO_LARGE",
+          "FOREIGN_CATALOG_CONNECTION_FAILED",
+          "RATE_LIMIT_ERROR",
+          "RESOURCE_BUSY",
+          "TIMEOUT_ERROR",
+          "ACCOUNT_NOT_PROVISIONED",
+          "BAD_GATEWAY_ERROR",
+          "GATEWAY_TIMEOUT_ERROR",
+          "NOT_IMPLEMENTED_ERROR",
+          "GONE_ERROR"
+        ],
+        "title": "ErrorClass",
+        "type": "string"
+      },
+      "ErrorInfo": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorClass",
+            "description": "The error code"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Machine-readable facts about the error a client can act on, when there are any",
+            "title": "Data"
+          },
+          "details": {
+            "description": "Details about the error",
+            "title": "Details",
+            "type": "string"
+          },
+          "documentation_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL to related documentation",
+            "title": "Documentation Url"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The field that caused the error if applicable",
+            "title": "Field"
+          },
+          "message": {
+            "description": "A human-readable message describing the error",
+            "title": "Message",
+            "type": "string"
+          },
+          "path": {
+            "description": "The path to the field that caused the error",
+            "title": "Path",
+            "type": "string"
+          },
+          "suggestion": {
+            "default": "Contact us at support@wherobots.com to get help with resolving your error.",
+            "description": "Suggested action to resolve the error",
+            "title": "Suggestion",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "details",
+          "path"
+        ],
+        "title": "ErrorInfo",
+        "type": "object"
+      },
+      "FileDependency-Input": {
+        "description": "Model for the dependency of a run",
+        "properties": {
+          "filePath": {
+            "pattern": "\\.(jar|whl|zip|json)$",
+            "title": "Filepath",
+            "type": "string"
+          },
+          "sourceType": {
+            "$ref": "#/components/schemas/DependencySourceType",
+            "default": "FILE"
+          }
+        },
+        "required": [
+          "filePath"
+        ],
+        "title": "FileDependency",
+        "type": "object"
+      },
+      "FileDependency-Output": {
+        "description": "Model for the dependency of a run",
+        "properties": {
+          "filePath": {
+            "pattern": "\\.(jar|whl|zip|json)$",
+            "title": "Filepath",
+            "type": "string"
+          },
+          "fileType": {
+            "$ref": "#/components/schemas/DependencyFileType",
+            "description": "Get the type of the file",
+            "readOnly": true
+          },
+          "sourceType": {
+            "$ref": "#/components/schemas/DependencySourceType",
+            "default": "FILE"
+          }
+        },
+        "required": [
+          "filePath",
+          "fileType"
+        ],
+        "title": "FileDependency",
+        "type": "object"
+      },
+      "FileEntry": {
+        "properties": {
+          "lastModified": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastmodified"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "protected": {
+            "default": false,
+            "title": "Protected",
+            "type": "boolean"
+          },
+          "size": {
+            "default": 0,
+            "title": "Size",
+            "type": "integer"
+          },
+          "type": {
+            "$ref": "#/components/schemas/FileEntryType"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "type"
+        ],
+        "title": "FileEntry",
+        "type": "object"
+      },
+      "FileEntryType": {
+        "enum": [
+          "FILE",
+          "FOLDER"
+        ],
+        "title": "FileEntryType",
+        "type": "string"
+      },
+      "FileStore": {
+        "properties": {
+          "bucketName": {
+            "title": "Bucketname",
+            "type": "string"
+          },
+          "createTime": {
+            "format": "date-time",
+            "title": "Createtime",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "updateTime": {
+            "format": "date-time",
+            "title": "Updatetime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "createTime",
+          "updateTime",
+          "bucketName"
+        ],
+        "title": "FileStore",
+        "type": "object"
+      },
+      "GpuType": {
+        "enum": [
+          "NVIDIA A10G"
+        ],
+        "title": "GpuType",
+        "type": "string"
+      },
+      "HumanPrincipal": {
+        "properties": {
+          "createTime": {
+            "format": "date-time",
+            "title": "Createtime",
+            "type": "string"
+          },
+          "deletedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deletedat"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "organizationId": {
+            "title": "Organizationid",
+            "type": "string"
+          },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/Policy"
+            },
+            "title": "Policies",
+            "type": "array"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "updateTime": {
+            "format": "date-time",
+            "title": "Updatetime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "createTime",
+          "updateTime",
+          "organizationId",
+          "roles",
+          "policies",
+          "email"
+        ],
+        "title": "HumanPrincipal",
+        "type": "object"
+      },
+      "InstanceDetailsHint": {
+        "properties": {
+          "gpu": {
+            "default": 0,
+            "title": "Gpu",
+            "type": "integer"
+          },
+          "gpu_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GpuType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gpu_vram": {
+            "default": 0,
+            "title": "Gpu Vram",
+            "type": "integer"
+          }
+        },
+        "title": "InstanceDetailsHint",
+        "type": "object"
+      },
+      "InstantMetric": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DataValue"
+          },
+          "format": {
+            "$ref": "#/components/schemas/DataFormat"
+          }
+        },
+        "required": [
+          "data",
+          "format"
+        ],
+        "title": "InstantMetric",
+        "type": "object"
+      },
+      "IntHint": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "hint": {
+            "title": "Hint",
+            "type": "integer"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min"
+          }
+        },
+        "required": [
+          "hint",
+          "description"
+        ],
+        "title": "IntHint",
+        "type": "object"
+      },
+      "JupyterConfigHint": {
+        "properties": {
+          "diskSizeGB": {
+            "$ref": "#/components/schemas/IntHint"
+          },
+          "idleTimeoutMinutes": {
+            "$ref": "#/components/schemas/IntHint"
+          },
+          "regions": {
+            "$ref": "#/components/schemas/RegionsHint"
+          },
+          "runtimeTags": {
+            "$ref": "#/components/schemas/RuntimeTagsHint"
+          },
+          "runtimes": {
+            "$ref": "#/components/schemas/RuntimesHint"
+          },
+          "versions": {
+            "$ref": "#/components/schemas/VersionHint"
+          }
+        },
+        "required": [
+          "diskSizeGB",
+          "versions",
+          "regions",
+          "runtimes",
+          "runtimeTags",
+          "idleTimeoutMinutes"
+        ],
+        "title": "JupyterConfigHint",
+        "type": "object"
+      },
+      "KubeAppCreationMeta": {
+        "description": "``event_meta`` shape for ``EventCode.APP_START_CREATION``.\n\nCaptures decisions pinned at kube_app creation time so later steps can\nconsult them later without re-deriving.\n\n``use_v2_workflow`` is the v2 dispatcher marker — set to ``True`` when the\nkube_app runs the unified ``KubeAppWorkflow`` (ENGP-336 Stream E); its\nteardown is deferred to the marker-cleanup project.\n\n``user_files_storage_usage_mode`` is the personal-files mount mode resolved\nonce at creation, so EFS provisioning, S3 Files provisioning and helm\nrendering all read one answer and cannot disagree. ``None`` on apps created\nbefore it shipped, which read as the pre-feature default (``no_mount``).",
+        "properties": {
+          "use_v2_workflow": {
+            "default": false,
+            "title": "Use V2 Workflow",
+            "type": "boolean"
+          },
+          "user_files_storage_usage_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Files Storage Usage Mode"
+          }
+        },
+        "title": "KubeAppCreationMeta",
+        "type": "object"
+      },
+      "KubeAppEvent": {
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "createTime": {
+            "format": "date-time",
+            "title": "Createtime",
+            "type": "string"
+          },
+          "eventMeta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunEventMeta"
+              },
+              {
+                "$ref": "#/components/schemas/KubeAppCreationMeta"
+              },
+              {
+                "$ref": "#/components/schemas/NodeSchedulingMeta"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eventmeta"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "updateTime": {
+            "format": "date-time",
+            "title": "Updatetime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "createTime",
+          "updateTime"
+        ],
+        "title": "KubeAppEvent",
+        "type": "object"
+      },
+      "LogItem": {
+        "properties": {
+          "raw": {
+            "title": "Raw",
+            "type": "string"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "string"
+          }
+        },
+        "required": [
+          "timestamp",
+          "raw"
+        ],
+        "title": "LogItem",
+        "type": "object"
+      },
+      "LogsResponse": {
+        "properties": {
+          "current_page": {
+            "title": "Current Page",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LogItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_page": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Page"
+          }
+        },
+        "required": [
+          "items",
+          "current_page"
+        ],
+        "title": "LogsResponse",
+        "type": "object"
+      },
+      "MetricDetails_InstantMetric_": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "metric": {
+            "$ref": "#/components/schemas/InstantMetric"
+          }
+        },
+        "required": [
+          "display_name",
+          "metric"
+        ],
+        "title": "MetricDetails[InstantMetric]",
+        "type": "object"
+      },
+      "MetricDetails_SeriesMetric_": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "metric": {
+            "$ref": "#/components/schemas/SeriesMetric"
+          }
+        },
+        "required": [
+          "display_name",
+          "metric"
+        ],
+        "title": "MetricDetails[SeriesMetric]",
+        "type": "object"
+      },
+      "NodeSchedulingMeta": {
+        "description": "Metadata captured at node-scheduling time.\n\n``node_preexisted`` is True when the pod landed on a node that existed\nbefore the pod was created, False when the node was provisioned for\nthe pod (cold start).",
+        "properties": {
+          "node_creation_time": {
+            "title": "Node Creation Time",
+            "type": "string"
+          },
+          "node_name": {
+            "title": "Node Name",
+            "type": "string"
+          },
+          "node_preexisted": {
+            "title": "Node Preexisted",
+            "type": "boolean"
+          },
+          "pod_creation_time": {
+            "title": "Pod Creation Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_preexisted",
+          "node_name",
+          "pod_creation_time",
+          "node_creation_time"
+        ],
+        "title": "NodeSchedulingMeta",
+        "type": "object"
+      },
+      "Organization": {
+        "properties": {
+          "allowedRegions": {
+            "items": {
+              "type": "string"
+            },
+            "readOnly": true,
+            "title": "Allowedregions",
+            "type": "array"
+          },
+          "billingContact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Billingcontact"
+          },
+          "createTime": {
+            "format": "date-time",
+            "title": "Createtime",
+            "type": "string"
+          },
+          "defaultEnvironmentOverridePresetId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Defaultenvironmentoverridepresetid"
+          },
+          "defaultEnvironmentPresetId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Defaultenvironmentpresetid"
+          },
+          "defaultRegion": {
+            "title": "Defaultregion",
+            "type": "string"
+          },
+          "defaultRuntime": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuntimeId"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": "tiny"
+          },
+          "deletedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deletedat"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "domainIsVerified": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domainisverified"
+          },
+          "fileStore": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileStore"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "lastStateChange": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Laststatechange"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Plan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "samlSsoStatus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SamlSsoStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/OrganizationCustomer"
+            },
+            "title": "Services",
+            "type": "array"
+          },
+          "state": {
+            "$ref": "#/components/schemas/OrganizationState"
+          },
+          "storageIntegrations": {
+            "items": {
+              "$ref": "#/components/schemas/StorageIntegrationDetails"
+            },
+            "title": "Storageintegrations",
+            "type": "array"
+          },
+          "updateTime": {
+            "format": "date-time",
+            "title": "Updatetime",
+            "type": "string"
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/OrganizationCustomer"
+            },
+            "title": "Users",
+            "type": "array"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          },
+          "wherobotsCloudFeatures": {
+            "items": {
+              "$ref": "#/components/schemas/WherobotsCloudFeature"
+            },
+            "title": "Wherobotscloudfeatures",
+            "type": "array"
+          },
+          "workosOrganizationId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workosorganizationid"
+          }
+        },
+        "required": [
+          "id",
+          "createTime",
+          "updateTime",
+          "name",
+          "wherobotsCloudFeatures",
+          "users",
+          "services",
+          "roles",
+          "storageIntegrations",
+          "verified",
+          "defaultRegion",
+          "state",
+          "allowedRegions"
+        ],
+        "title": "Organization",
+        "type": "object"
+      },
+      "OrganizationCustomer": {
+        "properties": {
+          "createTime": {
+            "format": "date-time",
+            "title": "Createtime",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "updateTime": {
+            "format": "date-time",
+            "title": "Updatetime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "createTime",
+          "updateTime",
+          "roles"
+        ],
+        "title": "OrganizationCustomer",
+        "type": "object"
+      },
+      "OrganizationState": {
+        "enum": [
+          "ACTIVE",
+          "SUSPENDED",
+          "CLOSED",
+          "EXPIRED"
+        ],
+        "title": "OrganizationState",
+        "type": "string"
+      },
+      "Plan": {
+        "enum": [
+          "COMMUNITY",
+          "PROFESSIONAL",
+          "BUILDER",
+          "ENTERPRISE"
+        ],
+        "title": "Plan",
+        "type": "string"
+      },
+      "Policy": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "createTime": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Createtime"
+          },
+          "effect": {
+            "$ref": "#/components/schemas/Effect"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "locator": {
+            "title": "Locator",
+            "type": "string"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/Provider"
+          },
+          "updateTime": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updatetime"
+          }
+        },
+        "required": [
+          "provider",
+          "locator",
+          "action",
+          "effect"
+        ],
+        "title": "Policy",
+        "type": "object"
+      },
+      "Provider": {
+        "enum": [
+          "WHEROBOTS",
+          "AWS"
+        ],
+        "title": "Provider",
+        "type": "string"
+      },
+      "PyPiDependency": {
+        "description": "Model for the dependency of a run",
+        "properties": {
+          "libraryName": {
+            "title": "Libraryname",
+            "type": "string"
+          },
+          "libraryVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Libraryversion"
+          },
+          "sourceType": {
+            "$ref": "#/components/schemas/DependencySourceType",
+            "default": "PYPI"
+          }
+        },
+        "required": [
+          "libraryName"
+        ],
+        "title": "PyPiDependency",
+        "type": "object"
+      },
+      "Region": {
+        "properties": {
+          "availability": {
+            "$ref": "#/components/schemas/ComputeClusterAvailability"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "externalAccountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Externalaccountid"
+          },
+          "regionName": {
+            "title": "Regionname",
+            "type": "string"
+          }
+        },
+        "required": [
+          "regionName",
+          "enabled",
+          "availability"
+        ],
+        "title": "Region",
+        "type": "object"
+      },
+      "RegionsHint": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "hint": {
+            "items": {
+              "$ref": "#/components/schemas/Region"
+            },
+            "title": "Hint",
+            "type": "array"
+          }
+        },
+        "required": [
+          "description",
+          "hint"
+        ],
+        "title": "RegionsHint",
+        "type": "object"
+      },
+      "Role": {
+        "properties": {
+          "createTime": {
+            "format": "date-time",
+            "title": "Createtime",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "organizationId": {
+            "title": "Organizationid",
+            "type": "string"
+          },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/Policy"
+            },
+            "title": "Policies",
+            "type": "array"
+          },
+          "updateTime": {
+            "format": "date-time",
+            "title": "Updatetime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "createTime",
+          "updateTime",
+          "name",
+          "organizationId",
+          "policies"
+        ],
+        "title": "Role",
+        "type": "object"
+      },
+      "RunAppMeta": {
+        "description": "Run-specific metadata fields",
+        "properties": {
+          "resolved_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved Version"
+          },
+          "spark_eventlogs_url": {
+            "default": "",
+            "title": "Spark Eventlogs Url",
+            "type": "string"
+          },
+          "spark_ui_url": {
+            "default": "",
+            "title": "Spark Ui Url",
+            "type": "string"
+          }
+        },
+        "title": "RunAppMeta",
+        "type": "object"
+      },
+      "RunEnvironment-Input": {
+        "description": "Model for runtime environment configs, include spark cluster configs, dependencies.\nWhen we have new configs like Dax configs, env vars, etc, we can add them here.",
+        "properties": {
+          "dependencies": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PyPiDependency"
+                },
+                {
+                  "$ref": "#/components/schemas/FileDependency-Input"
+                }
+              ]
+            },
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "sparkConfigs": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Sparkconfigs",
+            "type": "object"
+          },
+          "sparkDriverDiskGB": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sparkdriverdiskgb"
+          },
+          "sparkExecutorDiskGB": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sparkexecutordiskgb"
+          }
+        },
+        "title": "RunEnvironment",
+        "type": "object"
+      },
+      "RunEnvironment-Output": {
+        "description": "Model for runtime environment configs, include spark cluster configs, dependencies.\nWhen we have new configs like Dax configs, env vars, etc, we can add them here.",
+        "properties": {
+          "dependencies": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PyPiDependency"
+                },
+                {
+                  "$ref": "#/components/schemas/FileDependency-Output"
+                }
+              ]
+            },
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "sparkConfigs": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Sparkconfigs",
+            "type": "object"
+          },
+          "sparkDriverDiskGB": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sparkdriverdiskgb"
+          },
+          "sparkExecutorDiskGB": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sparkexecutordiskgb"
+          }
+        },
+        "title": "RunEnvironment",
+        "type": "object"
+      },
+      "RunEventMeta": {
+        "description": "Execution timing and optional producer-attributed terminal failure cause.",
+        "properties": {
+          "end_timestamp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Timestamp"
+          },
+          "failure_class": {
+            "anyOf": [
+              {
+                "enum": [
+                  "PLATFORM",
+                  "USER_CODE",
+                  "CONFIG_REJECTED"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Class"
+          },
+          "start_timestamp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Timestamp"
+          }
+        },
+        "title": "RunEventMeta",
+        "type": "object"
+      },
+      "RunJarPayload": {
+        "description": "Model for the payload of Run with type == \"python\"",
+        "properties": {
+          "args": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Args",
+            "type": "array"
+          },
+          "mainClass": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mainclass"
+          },
+          "uri": {
+            "title": "Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "uri"
+        ],
+        "title": "RunJarPayload",
+        "type": "object"
+      },
+      "RunKubeApp": {
+        "properties": {
+          "apiPayload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apipayload"
+          },
+          "appMeta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunAppMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "appType": {
+            "$ref": "#/components/schemas/AppType"
+          },
+          "cpuUsage": {
+            "title": "Cpuusage",
+            "type": "integer"
+          },
+          "createTime": {
+            "format": "date-time",
+            "title": "Createtime",
+            "type": "string"
+          },
+          "createdById": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Createdbyid"
+          },
+          "events": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/KubeAppEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "instanceId": {
+            "title": "Instanceid",
+            "type": "string"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Return the latest trace info that is valuable for troubleshooting",
+            "readOnly": true,
+            "title": "Message"
+          },
+          "regionName": {
+            "title": "Regionname",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AppStatus"
+          },
+          "updateTime": {
+            "format": "date-time",
+            "title": "Updatetime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "createTime",
+          "updateTime",
+          "instanceId",
+          "appType",
+          "status",
+          "createdById",
+          "cpuUsage",
+          "regionName",
+          "message"
+        ],
+        "title": "RunKubeApp",
+        "type": "object"
+      },
+      "RunMetricsResponse": {
+        "properties": {
+          "instant_metrics": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MetricDetails_InstantMetric_"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/WorkloadMetric"
+            },
+            "title": "Instant Metrics",
+            "type": "object"
+          },
+          "series_metrics": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MetricDetails_SeriesMetric_"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/WorkloadMetric"
+            },
+            "title": "Series Metrics",
+            "type": "object"
+          }
+        },
+        "required": [
+          "series_metrics",
+          "instant_metrics"
+        ],
+        "title": "RunMetricsResponse",
+        "type": "object"
+      },
+      "RunPythonPayload": {
+        "description": "Model for the payload of Run with type == \"python\"",
+        "properties": {
+          "args": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Args",
+            "type": "array"
+          },
+          "uri": {
+            "title": "Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "uri"
+        ],
+        "title": "RunPythonPayload",
+        "type": "object"
+      },
+      "RunStatus": {
+        "enum": [
+          "PENDING",
+          "RUNNING",
+          "FAILED",
+          "COMPLETED",
+          "CANCELLED",
+          "TIMED_OUT"
+        ],
+        "title": "RunStatus",
+        "type": "string"
+      },
+      "RunView": {
+        "properties": {
+          "completeTime": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completetime"
+          },
+          "createTime": {
+            "format": "date-time",
+            "title": "Createtime",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kubeApp": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunKubeApp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/CreateRunPayload-Output"
+          },
+          "startTime": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starttime"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "triggeredBy": {
+            "$ref": "#/components/schemas/OrganizationCustomer"
+          },
+          "updateTime": {
+            "format": "date-time",
+            "title": "Updatetime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "createTime",
+          "updateTime",
+          "name",
+          "status",
+          "triggeredBy",
+          "payload"
+        ],
+        "title": "RunView",
+        "type": "object"
+      },
+      "RuntimeHintItem": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "$ref": "#/components/schemas/RuntimeId"
+          },
+          "instanceDetails": {
+            "$ref": "#/components/schemas/InstanceDetailsHint"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "size": {
+            "$ref": "#/components/schemas/RuntimeSize"
+          },
+          "tags": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RuntimeTag"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "description",
+          "name",
+          "size",
+          "instanceDetails"
+        ],
+        "title": "RuntimeHintItem",
+        "type": "object"
+      },
+      "RuntimeId": {
+        "description": "Compute runtime ID. Legacy uppercase values are deprecated; use lowercase IDs.",
+        "enum": [
+          "TINY",
+          "SMALL",
+          "MEDIUM",
+          "LARGE",
+          "XLARGE",
+          "XXLARGE",
+          "micro",
+          "tiny",
+          "small",
+          "medium",
+          "large",
+          "x-large",
+          "2x-large",
+          "4x-large",
+          "medium-himem",
+          "large-himem",
+          "x-large-himem",
+          "2x-large-himem",
+          "4x-large-himem",
+          "x-large-hicpu",
+          "2x-large-hicpu",
+          "x-large-matcher",
+          "2x-large-matcher",
+          "micro-a10-gpu",
+          "tiny-a10-gpu",
+          "small-a10-gpu",
+          "medium-a10-gpu",
+          "large-a10-gpu",
+          "x-large-a10-gpu"
+        ],
+        "title": "RuntimeId",
+        "type": "string",
+        "x-deprecated": [
+          "TINY",
+          "SMALL",
+          "MEDIUM",
+          "LARGE",
+          "XLARGE",
+          "XXLARGE"
+        ],
+        "x-deprecated-values": [
+          "TINY",
+          "SMALL",
+          "MEDIUM",
+          "LARGE",
+          "XLARGE",
+          "XXLARGE"
+        ]
+      },
+      "RuntimeSize": {
+        "enum": [
+          "MICRO",
+          "TINY",
+          "SMALL",
+          "MEDIUM",
+          "LARGE",
+          "XLARGE",
+          "XXLARGE",
+          "XXXXLARGE"
+        ],
+        "title": "RuntimeSize",
+        "type": "string"
+      },
+      "RuntimeTag": {
+        "enum": [
+          "GPU",
+          "HIMEM",
+          "HICPU",
+          "MATCHER"
+        ],
+        "title": "RuntimeTag",
+        "type": "string"
+      },
+      "RuntimeTagsHint": {
+        "properties": {
+          "hint": {
+            "items": {
+              "$ref": "#/components/schemas/RuntimeTag"
+            },
+            "title": "Hint",
+            "type": "array"
+          }
+        },
+        "required": [
+          "hint"
+        ],
+        "title": "RuntimeTagsHint",
+        "type": "object"
+      },
+      "RuntimesHint": {
+        "properties": {
+          "hint": {
+            "items": {
+              "$ref": "#/components/schemas/RuntimeHintItem"
+            },
+            "title": "Hint",
+            "type": "array"
+          }
+        },
+        "required": [
+          "hint"
+        ],
+        "title": "RuntimesHint",
+        "type": "object"
+      },
+      "SamlSsoStatus": {
+        "enum": [
+          "ACTIVE",
+          "INACTIVE",
+          "PENDING",
+          "FAILED"
+        ],
+        "title": "SamlSsoStatus",
+        "type": "string"
+      },
+      "SeriesMetric": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/DataValue"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "format": {
+            "$ref": "#/components/schemas/DataFormat"
+          }
+        },
+        "required": [
+          "data",
+          "format"
+        ],
+        "title": "SeriesMetric",
+        "type": "object"
+      },
+      "ServicePrincipal": {
+        "properties": {
+          "createTime": {
+            "format": "date-time",
+            "title": "Createtime",
+            "type": "string"
+          },
+          "deletedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deletedat"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "organizationId": {
+            "title": "Organizationid",
+            "type": "string"
+          },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/Policy"
+            },
+            "title": "Policies",
+            "type": "array"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "updateTime": {
+            "format": "date-time",
+            "title": "Updatetime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "createTime",
+          "updateTime",
+          "organizationId",
+          "roles",
+          "policies",
+          "name"
+        ],
+        "title": "ServicePrincipal",
+        "type": "object"
+      },
+      "StorageIntegrationDetails": {
+        "properties": {
+          "createTime": {
+            "format": "date-time",
+            "title": "Createtime",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "region": {
+            "title": "Region",
+            "type": "string"
+          },
+          "roleArn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rolearn"
+          },
+          "updateTime": {
+            "format": "date-time",
+            "title": "Updatetime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "createTime",
+          "updateTime",
+          "name",
+          "path",
+          "region"
+        ],
+        "title": "StorageIntegrationDetails",
+        "type": "object"
+      },
+      "VersionHint": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "hint": {
+            "items": {
+              "$ref": "#/components/schemas/WherobotsVersion"
+            },
+            "title": "Hint",
+            "type": "array"
+          }
+        },
+        "required": [
+          "hint",
+          "description"
+        ],
+        "title": "VersionHint",
+        "type": "object"
+      },
+      "WherobotsCloudFeature": {
+        "enum": [
+          "SAML",
+          "SERVICE_PRINCIPALS",
+          "STORAGE_INTEGRATION",
+          "PROFESSIONAL_DATA",
+          "AUDIT_LOGS",
+          "RUNS",
+          "FOREIGN_CATALOGS",
+          "RASTERFLOW",
+          "MCP_ACCESS",
+          "STANDALONE_WHEROBOTSDB",
+          "CLOUD_CONNECTIONS",
+          "MICRO_RUNTIME",
+          "SMALL_RUNTIME",
+          "MEDIUM_RUNTIME",
+          "LARGE_RUNTIME",
+          "X_LARGE_RUNTIME",
+          "XX_LARGE_RUNTIME",
+          "MEDIUM_HIMEM_RUNTIME",
+          "LARGE_HIMEM_RUNTIME",
+          "X_LARGE_HIMEM_RUNTIME",
+          "XX_LARGE_HIMEM_RUNTIME",
+          "X_LARGE_HICPU_RUNTIME",
+          "XX_LARGE_HICPU_RUNTIME",
+          "MICRO_A10_GPU_RUNTIME",
+          "TINY_A10_GPU_RUNTIME",
+          "SMALL_A10_GPU_RUNTIME",
+          "MEDIUM_A10_GPU_RUNTIME",
+          "LARGE_A10_GPU_RUNTIME",
+          "X_LARGE_A10_GPU_RUNTIME",
+          "X_LARGE_MATCHER_RUNTIME",
+          "XX_LARGE_MATCHER_RUNTIME",
+          "REGION_AWS_US_WEST_2",
+          "REGION_AWS_EU_WEST_1",
+          "REGION_AWS_US_EAST_1",
+          "REGION_AWS_AP_SOUTH_1",
+          "REGION_AWS_US_EAST_2"
+        ],
+        "title": "WherobotsCloudFeature",
+        "type": "string"
+      },
+      "WherobotsVersion": {
+        "properties": {
+          "aliases": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Aliases",
+            "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "version"
+        ],
+        "title": "WherobotsVersion",
+        "type": "object"
+      },
+      "WorkloadMetric": {
+        "enum": [
+          "CPU_UTILIZATION_PERCENT",
+          "MEMORY_UTILIZATION_PERCENT",
+          "GPU_UTILIZATION_PERCENT",
+          "GPU_MEMORY_UTILIZATION_PERCENT",
+          "COST_USD",
+          "CONSUMED_SPATIAL_UNITS"
+        ],
+        "title": "WorkloadMetric",
+        "type": "string"
+      },
+      "src__routers__files__UploadUrlResponse": {
+        "properties": {
+          "uploadUrl": {
+            "title": "Uploadurl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "uploadUrl"
+        ],
+        "title": "UploadUrlResponse",
+        "type": "object"
+      },
+      "src__routers__storageintegration__UploadUrlResponse": {
+        "properties": {
+          "destination": {
+            "title": "Destination",
+            "type": "string"
+          },
+          "uploadUrl": {
+            "title": "Uploadurl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "destination",
+          "uploadUrl"
+        ],
+        "title": "UploadUrlResponse",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Wherobots Cloud API OpenAPI specification.\n\n    These are the API docs for the Wherobots API. You can use this to test out the API and see what it does.\n    The underlying OPENAPI spec can be found at /openapi.json. This can be used to generate clients for the API.\n\n    The Authorize button below will allow you to input an access token to authenticate to our API.\n    Then all of the requests on the page should work.\n    ",
+    "title": "Wherobots Cloud API",
+    "version": "0.0.1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/files/dir": {
+      "get": {
+        "operationId": "getDirectory",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "dir",
+            "required": true,
+            "schema": {
+              "title": "Dir",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Directory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "List managed storage directory (legacy)",
+        "tags": [
+          "files"
+        ],
+        "x-exclude-from-cli": true,
+        "x-excluded": true
+      }
+    },
+    "/files/integration-dir": {
+      "get": {
+        "operationId": "getIntegrationDirectory",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "integration_id",
+            "required": true,
+            "schema": {
+              "title": "Integration Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dir",
+            "required": true,
+            "schema": {
+              "title": "Dir",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Directory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "List integration storage directory (legacy)",
+        "tags": [
+          "files"
+        ],
+        "x-exclude-from-cli": true,
+        "x-excluded": true
+      }
+    },
+    "/files/upload-url": {
+      "post": {
+        "operationId": "createUploadUrl",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__routers__files__UploadUrlResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "Create a file upload URL (legacy)",
+        "tags": [
+          "files"
+        ],
+        "x-exclude-from-cli": true,
+        "x-excluded": true
+      }
+    },
+    "/me/jupyter/lab/config-hint": {
+      "get": {
+        "operationId": "getNotebookConfigHint",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JupyterConfigHint"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "Get notebook config hints",
+        "tags": [
+          "jupyter_lab"
+        ],
+        "x-excluded": true
+      }
+    },
+    "/organization": {
+      "get": {
+        "operationId": "getMyOrganization",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Organization"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "Get current user's organization",
+        "tags": [
+          "organization"
+        ],
+        "x-excluded": true
+      }
+    },
+    "/runs": {
+      "get": {
+        "operationId": "listJobRuns",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "name",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "pattern": "^[a-zA-Z0-9_\\-\\.]*\\*?[a-zA-Z0-9_\\-\\.]*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Name"
+            }
+          },
+          {
+            "in": "query",
+            "name": "created_after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Created After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/RunStatus"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "region",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Region"
+            }
+          },
+          {
+            "description": "Cursor for the next page",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Cursor for the next page",
+              "title": "Cursor"
+            }
+          },
+          {
+            "description": "Page size",
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size",
+              "maximum": 100,
+              "minimum": 0,
+              "title": "Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage__T_Customized_RunView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "List job runs",
+        "tags": [
+          "runs"
+        ],
+        "x-excluded": true
+      },
+      "post": {
+        "operationId": "createJobRun",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "region",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Region"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRunPayload-Input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "Create a job run",
+        "tags": [
+          "runs"
+        ],
+        "x-excluded": false
+      }
+    },
+    "/runs/{run_id}": {
+      "get": {
+        "operationId": "getJobRun",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "Get a job run",
+        "tags": [
+          "runs"
+        ],
+        "x-excluded": true
+      }
+    },
+    "/runs/{run_id}/logs": {
+      "get": {
+        "operationId": "getJobRunLogs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "Get job run logs",
+        "tags": [
+          "runs"
+        ],
+        "x-excluded": true
+      }
+    },
+    "/runs/{run_id}/metrics": {
+      "get": {
+        "operationId": "getJobRunMetrics",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunMetricsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "Get job run metrics",
+        "tags": [
+          "runs"
+        ],
+        "x-excluded": true
+      }
+    },
+    "/storage/{storage_id}/directories/{path}": {
+      "delete": {
+        "operationId": "deleteDirectory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "storage_id",
+            "required": true,
+            "schema": {
+              "title": "Storage Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "Delete a directory from storage",
+        "tags": [
+          "storage"
+        ],
+        "x-excluded": true
+      },
+      "get": {
+        "operationId": "listDirectoryContents",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "storage_id",
+            "required": true,
+            "schema": {
+              "title": "Storage Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 1000,
+              "minimum": 0,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryListingResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "List directory contents",
+        "tags": [
+          "storage"
+        ],
+        "x-excluded": true
+      },
+      "put": {
+        "operationId": "createDirectory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "storage_id",
+            "required": true,
+            "schema": {
+              "title": "Storage Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "Create a directory in storage",
+        "tags": [
+          "storage"
+        ],
+        "x-excluded": true
+      }
+    },
+    "/storage/{storage_id}/file-rename/{path}": {
+      "post": {
+        "operationId": "renameFileInStorage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "storage_id",
+            "required": true,
+            "schema": {
+              "title": "Storage Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "new_name",
+            "required": true,
+            "schema": {
+              "title": "New Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "Rename a file in storage",
+        "tags": [
+          "storage"
+        ],
+        "x-excluded": true
+      }
+    },
+    "/storage/{storage_id}/file-upload-url/{path}": {
+      "post": {
+        "description": "Create an uploadUrl and destination S3 URI for managed storage or a storage integration. PUT the raw file bytes to uploadUrl without platform credentials, then use destination as the script definition URI. For compatibility with managed storage URLs using S3 Signature V2, PUT with an empty Content-Type header (curl -X PUT -H 'Content-Type:' --data-binary @script.py '<uploadUrl>'). Signature V2 signs the empty content type even though Content-Type is absent from the presign parameters; adding a nonempty value can fail signature verification. Do not send multipart form data or platform credentials to uploadUrl.",
+        "operationId": "createFileUploadUrl",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "storage_id",
+            "required": true,
+            "schema": {
+              "title": "Storage Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__routers__storageintegration__UploadUrlResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "Create a presigned file upload URL",
+        "tags": [
+          "storage"
+        ],
+        "x-excluded": false
+      }
+    },
+    "/storage/{storage_id}/files/{path}": {
+      "delete": {
+        "operationId": "deleteFileFromStorage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "storage_id",
+            "required": true,
+            "schema": {
+              "title": "Storage Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "Delete a file from storage",
+        "tags": [
+          "storage"
+        ],
+        "x-excluded": true
+      },
+      "get": {
+        "description": "Compatibility endpoint returning a 307 redirect to storage. WARNING: curl -L with a custom X-API-Key header can forward the platform credential to the redirect host. Prefer GET /storage/{storage_id}/file-download-url/{path}: authenticate once to obtain downloadUrl, then fetch it WITHOUT platform credentials.",
+        "operationId": "downloadFileFromStorage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "storage_id",
+            "required": true,
+            "schema": {
+              "title": "Storage Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "File downloaded successfully"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "Download a file from storage",
+        "tags": [
+          "storage"
+        ],
+        "x-excluded": true
+      }
+    },
+    "/users/me": {
+      "get": {
+        "operationId": "getMe",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Customer"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HumanPrincipal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ServicePrincipal"
+                    }
+                  ],
+                  "title": "Response Getme"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "wherobotsApiKey": []
+          }
+        ],
+        "summary": "Get current user profile",
+        "tags": [
+          "users",
+          "me"
+        ],
+        "x-excluded": true
+      }
+    }
+  }
+}

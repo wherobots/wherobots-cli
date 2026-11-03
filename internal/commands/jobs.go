@@ -10,6 +10,8 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 	"text/tabwriter"
@@ -17,8 +19,8 @@ import (
 
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
-	"github.com/tidwall/gjson"
 
+	"wherobots/cli/internal/api"
 	"wherobots/cli/internal/config"
 	"wherobots/cli/internal/executor"
 	"wherobots/cli/internal/spec"
@@ -28,15 +30,33 @@ const (
 	defaultRunTimeout  = 3600
 	defaultListLimit   = 20
 	defaultLogsPollSec = 2.0
+	logPageSize        = 500
 
 	outputText = "text"
 	outputJSON = "json"
 )
 
-var terminalStatuses = map[string]struct{}{
-	"COMPLETED": {},
-	"FAILED":    {},
-	"CANCELLED": {},
+type runPhase int
+
+const (
+	runPhaseUnknown runPhase = iota
+	runPhaseActive
+	runPhaseSucceeded
+	runPhaseFailed
+)
+
+// classifyRun sorts run statuses. A status newer than this build is unknown:
+// followers stop instead of waiting on a status that may never change.
+func classifyRun(status api.RunStatus) runPhase {
+	switch status {
+	case api.RunStatusPENDING, api.RunStatusRUNNING:
+		return runPhaseActive
+	case api.RunStatusCOMPLETED:
+		return runPhaseSucceeded
+	case api.RunStatusFAILED, api.RunStatusCANCELLED, api.RunStatusTIMEDOUT:
+		return runPhaseFailed
+	}
+	return runPhaseUnknown
 }
 
 type jobsRunner struct {
@@ -105,17 +125,17 @@ func newJobsRunner(cfg config.Config, creds executor.Credentials, runtimeSpec *s
 		runtime:         runtimeSpec,
 		client:          client,
 		flags:           flags,
-		createRun:       findOperation(runtimeSpec, "POST", "/runs"),
-		createUploadURL: findOperation(runtimeSpec, "POST", "/files/upload-url"),
-		getDirectory:    findOperation(runtimeSpec, "GET", "/files/dir"),
-		getIntegration:  findOperation(runtimeSpec, "GET", "/files/integration-dir"),
-		getConfigHint:   findOperation(runtimeSpec, "GET", "/me/jupyter/lab/config-hint"),
-		getMe:           findOperation(runtimeSpec, "GET", "/users/me"),
-		getOrganization: findOperation(runtimeSpec, "GET", "/organization"),
-		getRun:          findOperation(runtimeSpec, "GET", "/runs/{run_id}"),
-		getRunLogs:      findOperation(runtimeSpec, "GET", "/runs/{run_id}/logs"),
-		getRunMetrics:   findOperation(runtimeSpec, "GET", "/runs/{run_id}/metrics"),
-		listRuns:        findOperation(runtimeSpec, "GET", "/runs"),
+		createRun:       findOperation(runtimeSpec, api.CreateJobRun),
+		createUploadURL: findOperation(runtimeSpec, api.CreateUploadURL),
+		getDirectory:    findOperation(runtimeSpec, api.GetDirectory),
+		getIntegration:  findOperation(runtimeSpec, api.GetIntegrationDirectory),
+		getConfigHint:   findOperation(runtimeSpec, api.GetNotebookConfigHint),
+		getMe:           findOperation(runtimeSpec, api.GetMe),
+		getOrganization: findOperation(runtimeSpec, api.GetMyOrganization),
+		getRun:          findOperation(runtimeSpec, api.GetJobRun),
+		getRunLogs:      findOperation(runtimeSpec, api.GetJobRunLogs),
+		getRunMetrics:   findOperation(runtimeSpec, api.GetJobRunMetrics),
+		listRuns:        findOperation(runtimeSpec, api.ListJobRuns),
 	}
 
 	if r.createRun == nil || r.getRun == nil || r.getRunLogs == nil || r.listRuns == nil || r.createUploadURL == nil || r.getDirectory == nil || r.getOrganization == nil {
@@ -143,7 +163,7 @@ func curatedCommandName(cmd *cobra.Command) string {
 	return strings.Join(segments, ".")
 }
 
-func findOperation(runtimeSpec *spec.RuntimeSpec, method, path string) *spec.Operation {
+func findOperation[T any](runtimeSpec *spec.RuntimeSpec, target api.Operation[T]) *spec.Operation {
 	if runtimeSpec == nil {
 		return nil
 	}
@@ -151,11 +171,19 @@ func findOperation(runtimeSpec *spec.RuntimeSpec, method, path string) *spec.Ope
 		if op == nil {
 			continue
 		}
-		if strings.EqualFold(op.Method, method) && op.Path == path {
+		if strings.EqualFold(op.Method, target.Method) && op.Path == target.Path {
 			return op
 		}
 	}
 	return nil
+}
+
+// optional leaves a blank flag out of the request.
+func optional(value string) *string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	return &value
 }
 
 func requiredJobArgument(name, example string) cobra.PositionalArgs {
@@ -228,10 +256,7 @@ func (r *jobsRunner) newCreateCommand() *cobra.Command {
 
 			// Only send region when set; an omitted region lets the API apply
 			// the organization's configured default.
-			var query []executor.QueryPair
-			if strings.TrimSpace(runRegion) != "" {
-				query = append(query, executor.QueryPair{Key: "region", Value: runRegion})
-			}
+			query := executor.QueryParams(api.CreateJobRunParams{Region: optional(runRegion)})
 
 			respBody, err := r.executeOrDryRun(cmd.Context(), cmd.OutOrStdout(), r.createRun, nil, query, string(payloadJSON))
 			if err != nil {
@@ -241,7 +266,11 @@ func (r *jobsRunner) newCreateCommand() *cobra.Command {
 				return nil
 			}
 
-			runID := strings.TrimSpace(gjson.GetBytes(respBody, "id").String())
+			run, err := api.CreateJobRun.Decode(respBody)
+			if err != nil {
+				return fmt.Errorf("decode create run response: %w", err)
+			}
+			runID := strings.TrimSpace(run.ID)
 			if runID == "" {
 				return fmt.Errorf("create run response is missing id")
 			}
@@ -251,7 +280,7 @@ func (r *jobsRunner) newCreateCommand() *cobra.Command {
 					_, err = fmt.Fprintln(cmd.OutOrStdout(), string(respBody))
 					return err
 				}
-				return writeRunSummary(cmd.OutOrStdout(), respBody)
+				return writeRunSummary(cmd.OutOrStdout(), run)
 			}
 
 			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Submitted run %s\n", runID)
@@ -271,8 +300,15 @@ func (r *jobsRunner) newCreateCommand() *cobra.Command {
 				return err
 			}
 
-			finalStatus := strings.ToUpper(strings.TrimSpace(gjson.GetBytes(finalBody, "status").String()))
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "\nRun finished: %s\n", finalStatus)
+			finalRun, err := api.GetJobRun.Decode(finalBody)
+			if err != nil {
+				return fmt.Errorf("decode run: %w", err)
+			}
+			finalStatus := finalRun.Status
+			phase := classifyRun(finalStatus)
+			if phase != runPhaseUnknown {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "\nRun finished: %s\n", finalStatus)
+			}
 
 			if output == outputJSON {
 				_, err = fmt.Fprintln(cmd.OutOrStdout(), string(finalBody))
@@ -281,10 +317,13 @@ func (r *jobsRunner) newCreateCommand() *cobra.Command {
 				}
 			}
 
-			if finalStatus == "FAILED" || finalStatus == "CANCELLED" {
-				return fmt.Errorf("run finished with status %s", finalStatus)
+			switch phase {
+			case runPhaseSucceeded:
+				return nil
+			case runPhaseUnknown:
+				return fmt.Errorf("stopped watching at unrecognized status %s; the run may still be active", finalStatus)
 			}
-			return nil
+			return fmt.Errorf("run finished with status %s", finalStatus)
 		},
 	}
 
@@ -308,66 +347,58 @@ func (r *jobsRunner) newCreateCommand() *cobra.Command {
 	return cmd
 }
 
-func buildRunPayload(script, name, runtimeID string, timeoutSec int, argsRaw string, sparkConfigs, depPypi, depFiles []string, jarMainClass string) (map[string]any, error) {
+func buildRunPayload(script, name, runtimeID string, timeoutSec int, argsRaw string, sparkConfigs, depPypi, depFiles []string, jarMainClass string) (api.CreateJobRunJSONRequestBody, error) {
+	var payload api.CreateJobRunJSONRequestBody
 	if strings.TrimSpace(name) == "" {
-		return nil, fmt.Errorf("--name is required")
+		return payload, fmt.Errorf("--name is required")
 	}
 	if timeoutSec <= 0 {
-		return nil, fmt.Errorf("--timeout must be greater than 0")
+		return payload, fmt.Errorf("--timeout must be greater than 0")
 	}
 
 	parsedArgs, err := parseScriptArgs(argsRaw)
 	if err != nil {
-		return nil, err
+		return payload, err
 	}
 
 	isJar := strings.EqualFold(filepath.Ext(script), ".jar")
 	if isJar && strings.TrimSpace(jarMainClass) == "" {
-		return nil, fmt.Errorf("--jar-main-class is required for JAR files")
+		return payload, fmt.Errorf("--jar-main-class is required for JAR files")
 	}
 
-	payload := map[string]any{
-		"name":           name,
-		"timeoutSeconds": timeoutSec,
-	}
+	payload.Name = name
+	payload.TimeoutSeconds = &timeoutSec
 	// Only send runtime when set; an omitted runtime lets the API apply the
 	// organization's configured default.
 	if strings.TrimSpace(runtimeID) != "" {
-		payload["runtime"] = runtimeID
+		payload.Runtime = api.Ptr(api.RuntimeID(runtimeID))
 	}
 
 	if isJar {
-		payload["runJar"] = map[string]any{
-			"uri":       script,
-			"mainClass": jarMainClass,
-			"args":      parsedArgs,
-		}
+		payload.RunJar = &api.RunJarPayload{URI: script, MainClass: &jarMainClass, Args: &parsedArgs}
 	} else {
-		payload["runPython"] = map[string]any{
-			"uri":  script,
-			"args": parsedArgs,
-		}
+		payload.RunPython = &api.RunPythonPayload{URI: script, Args: &parsedArgs}
 	}
 
-	environment := map[string]any{}
+	var environment api.RunEnvironmentInput
 	if len(sparkConfigs) > 0 {
 		cfgs, err := parseSparkConfigs(sparkConfigs)
 		if err != nil {
-			return nil, err
+			return payload, err
 		}
-		environment["sparkConfigs"] = cfgs
+		environment.SparkConfigs = &cfgs
 	}
 
 	dependencies, err := parseDependencies(depPypi, depFiles)
 	if err != nil {
-		return nil, err
+		return payload, err
 	}
 	if len(dependencies) > 0 {
-		environment["dependencies"] = dependencies
+		environment.Dependencies = &dependencies
 	}
 
-	if len(environment) > 0 {
-		payload["environment"] = environment
+	if environment.SparkConfigs != nil || environment.Dependencies != nil {
+		payload.Environment = &environment
 	}
 
 	return payload, nil
@@ -385,17 +416,17 @@ func parseSparkConfigs(entries []string) (map[string]string, error) {
 	return out, nil
 }
 
-func parseDependencies(depPypi, depFiles []string) ([]map[string]any, error) {
-	deps := make([]map[string]any, 0, len(depPypi)+len(depFiles))
+func parseDependencies(depPypi, depFiles []string) ([]any, error) {
+	deps := make([]any, 0, len(depPypi)+len(depFiles))
 	for _, dep := range depPypi {
 		parts := strings.SplitN(dep, "==", 2)
 		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
 			return nil, fmt.Errorf("invalid --dep-pypi %q (expected name==version)", dep)
 		}
-		deps = append(deps, map[string]any{
-			"sourceType":     "PYPI",
-			"libraryName":    strings.TrimSpace(parts[0]),
-			"libraryVersion": strings.TrimSpace(parts[1]),
+		deps = append(deps, api.PyPiDependency{
+			SourceType:     api.Ptr(api.DependencySourceTypePYPI),
+			LibraryName:    strings.TrimSpace(parts[0]),
+			LibraryVersion: api.Ptr(strings.TrimSpace(parts[1])),
 		})
 	}
 
@@ -403,9 +434,9 @@ func parseDependencies(depPypi, depFiles []string) ([]map[string]any, error) {
 		if !hasAllowedDependencyExt(dep) {
 			return nil, fmt.Errorf("invalid --dep-file %q (supported extensions: .jar, .whl, .zip, .json)", dep)
 		}
-		deps = append(deps, map[string]any{
-			"sourceType": "FILE",
-			"filePath":   dep,
+		deps = append(deps, api.FileDependencyInput{
+			SourceType: api.Ptr(api.DependencySourceTypeFILE),
+			FilePath:   dep,
 		})
 	}
 	return deps, nil
@@ -464,12 +495,16 @@ func (r *jobsRunner) prepareScript(ctx context.Context, script, name string, noU
 
 	key := fmt.Sprintf("%s/%s/%s", strings.Trim(prefix, "/"), name, filepath.Base(script))
 	uploadKey := fmt.Sprintf("%s/%s", bucket, key)
-	respBody, err := r.execWithRetry(ctx, r.createUploadURL, nil, []executor.QueryPair{{Key: "key", Value: uploadKey}}, "")
+	respBody, err := r.execWithRetry(ctx, r.createUploadURL, nil, executor.QueryParams(api.CreateUploadURLParams{Key: uploadKey}), "")
 	if err != nil {
 		return "", wrapUploadURLError(err, bucket, key, overrideSource)
 	}
 
-	uploadURL := strings.TrimSpace(gjson.GetBytes(respBody, "uploadUrl").String())
+	upload, err := api.CreateUploadURL.Decode(respBody)
+	if err != nil {
+		return "", fmt.Errorf("decode upload URL response: %w", err)
+	}
+	uploadURL := strings.TrimSpace(upload.UploadURL)
 	if uploadURL == "" {
 		return "", fmt.Errorf("upload URL response missing uploadUrl")
 	}
@@ -518,7 +553,16 @@ func (r *jobsRunner) resolveManagedUploadTarget(ctx context.Context, uploadPathO
 		return "", "", uploadOverrideNone, fmt.Errorf("unable to resolve managed storage directory via API: failed to fetch organization: %w", err)
 	}
 
-	bucket := strings.TrimSpace(gjson.GetBytes(orgBody, "fileStore.bucketName").String())
+	org, err := api.GetMyOrganization.Decode(orgBody)
+	if err != nil {
+		return "", "", uploadOverrideNone, fmt.Errorf("unable to resolve managed storage directory via API: decode organization: %w", err)
+	}
+
+	var bucket, fileStoreID string
+	if org.FileStore != nil {
+		bucket = strings.TrimSpace(org.FileStore.BucketName)
+		fileStoreID = strings.TrimSpace(org.FileStore.ID)
+	}
 	// Normalize bucket: if the API returns a full S3 URI (e.g. "s3://bucket-name"),
 	// extract only the bucket name portion.
 	if parsedBucket, _, ok := splitS3Path(bucket); ok && parsedBucket != "" {
@@ -529,23 +573,20 @@ func (r *jobsRunner) resolveManagedUploadTarget(ctx context.Context, uploadPathO
 	}
 
 	integrationIDs := make([]string, 0, 4)
-	storageIntegrations := gjson.GetBytes(orgBody, "storageIntegrations")
-	if storageIntegrations.IsArray() {
-		for _, item := range storageIntegrations.Array() {
-			id := strings.TrimSpace(item.Get("id").String())
-			if id == "" {
-				continue
-			}
-			path := strings.TrimSpace(item.Get("path").String())
-			if strings.HasPrefix(strings.ToLower(path), "s3://"+strings.ToLower(bucket)+"/") || strings.EqualFold(path, "s3://"+bucket) {
-				integrationIDs = append([]string{id}, integrationIDs...)
-				continue
-			}
-			integrationIDs = append(integrationIDs, id)
+	for _, item := range org.StorageIntegrations {
+		id := strings.TrimSpace(item.ID)
+		if id == "" {
+			continue
 		}
+		path := strings.TrimSpace(item.Path)
+		if strings.HasPrefix(strings.ToLower(path), "s3://"+strings.ToLower(bucket)+"/") || strings.EqualFold(path, "s3://"+bucket) {
+			integrationIDs = append([]string{id}, integrationIDs...)
+			continue
+		}
+		integrationIDs = append(integrationIDs, id)
 	}
-	if fallbackID := strings.TrimSpace(gjson.GetBytes(orgBody, "fileStore.id").String()); fallbackID != "" {
-		integrationIDs = append(integrationIDs, fallbackID)
+	if fileStoreID != "" {
+		integrationIDs = append(integrationIDs, fileStoreID)
 	}
 
 	seenIntegrationID := map[string]struct{}{}
@@ -560,11 +601,13 @@ func (r *jobsRunner) resolveManagedUploadTarget(ctx context.Context, uploadPathO
 		if r.getIntegration == nil {
 			break
 		}
-		integrationBody, integrationErr := r.execWithRetry(ctx, r.getIntegration, nil, []executor.QueryPair{{Key: "integration_id", Value: integrationID}, {Key: "dir", Value: "/"}}, "")
+		integrationBody, integrationErr := r.execWithRetry(ctx, r.getIntegration, nil, executor.QueryParams(api.GetIntegrationDirectoryParams{IntegrationID: integrationID, Dir: "/"}), "")
 		if integrationErr != nil {
 			continue
 		}
-		path := strings.TrimSpace(gjson.GetBytes(integrationBody, "path").String())
+		// These lookups are best effort: an unreadable body falls through like a failed one.
+		directory, _ := api.GetIntegrationDirectory.Decode(integrationBody)
+		path := strings.TrimSpace(directory.Path)
 		if path != "" {
 			parsedBucket, prefix, ok := splitS3Path(path)
 			if ok && parsedBucket != "" {
@@ -576,16 +619,18 @@ func (r *jobsRunner) resolveManagedUploadTarget(ctx context.Context, uploadPathO
 		}
 	}
 
-	orgID := strings.TrimSpace(gjson.GetBytes(orgBody, "id").String())
+	orgID := strings.TrimSpace(org.ID)
 
 	// Try to find the user's personal writable directory using the current user's ID.
 	if orgID != "" && r.getMe != nil {
 		if meBody, meErr := r.execWithRetry(ctx, r.getMe, nil, nil, ""); meErr == nil {
-			userID := strings.TrimSpace(gjson.GetBytes(meBody, "id").String())
+			me, _ := api.GetMe.Decode(meBody)
+			userID := strings.TrimSpace(me.ID)
 			if userID != "" {
 				userDir := fmt.Sprintf("%s/%s/data/customer-%s", bucket, orgID, userID)
-				if dirBody, dirErr := r.execWithRetry(ctx, r.getDirectory, nil, []executor.QueryPair{{Key: "dir", Value: userDir}}, ""); dirErr == nil {
-					path := strings.TrimSpace(gjson.GetBytes(dirBody, "path").String())
+				if dirBody, dirErr := r.execWithRetry(ctx, r.getDirectory, nil, executor.QueryParams(api.GetDirectoryParams{Dir: userDir}), ""); dirErr == nil {
+					directory, _ := api.GetDirectory.Decode(dirBody)
+					path := strings.TrimSpace(directory.Path)
 					if !strings.HasPrefix(strings.ToLower(path), "s3://") {
 						path = "s3://" + path
 					}
@@ -597,11 +642,15 @@ func (r *jobsRunner) resolveManagedUploadTarget(ctx context.Context, uploadPathO
 		}
 	}
 
-	dirBody, err := r.execWithRetry(ctx, r.getDirectory, nil, []executor.QueryPair{{Key: "dir", Value: bucket}}, "")
+	dirBody, err := r.execWithRetry(ctx, r.getDirectory, nil, executor.QueryParams(api.GetDirectoryParams{Dir: bucket}), "")
 	if err != nil {
 		return "", "", uploadOverrideNone, fmt.Errorf("unable to resolve managed storage directory via API: %w", err)
 	}
-	path := strings.TrimSpace(gjson.GetBytes(dirBody, "path").String())
+	directory, err := api.GetDirectory.Decode(dirBody)
+	if err != nil {
+		return "", "", uploadOverrideNone, fmt.Errorf("unable to resolve managed storage directory via API: decode directory: %w", err)
+	}
+	path := strings.TrimSpace(directory.Path)
 	if path == "" {
 		return "", "", uploadOverrideNone, fmt.Errorf("managed storage directory response missing path")
 	}
@@ -723,7 +772,8 @@ func (r *jobsRunner) newLogsCommand() *cobra.Command {
 				if tail > 0 {
 					size = tail
 				}
-				respBody, err := r.executeOrDryRun(cmd.Context(), cmd.OutOrStdout(), r.getRunLogs, []string{runID}, []executor.QueryPair{{Key: "cursor", Value: "0"}, {Key: "size", Value: fmt.Sprintf("%d", size)}}, "")
+				query := executor.QueryParams(api.GetJobRunLogsParams{Cursor: api.Ptr("0"), Size: &size})
+				respBody, err := r.executeOrDryRun(cmd.Context(), cmd.OutOrStdout(), r.getRunLogs, []string{runID}, query, "")
 				if err != nil {
 					return err
 				}
@@ -736,7 +786,10 @@ func (r *jobsRunner) newLogsCommand() *cobra.Command {
 					return err
 				}
 
-				lines := extractLogLines(respBody)
+				lines, err := extractLogLines(respBody)
+				if err != nil {
+					return err
+				}
 				if tail > 0 && len(lines) > tail {
 					lines = lines[len(lines)-tail:]
 				}
@@ -772,20 +825,18 @@ func (r *jobsRunner) newLogsCommand() *cobra.Command {
 	return cmd
 }
 
-func extractLogLines(body []byte) []string {
-	items := gjson.GetBytes(body, "items")
-	if !items.IsArray() {
-		return nil
+func extractLogLines(body []byte) ([]string, error) {
+	page, err := api.GetJobRunLogs.Decode(body)
+	if err != nil {
+		return nil, fmt.Errorf("decode run logs: %w", err)
 	}
-	out := make([]string, 0, len(items.Array()))
-	for _, item := range items.Array() {
-		line := item.Get("raw").String()
-		if line == "" {
-			continue
+	out := make([]string, 0, len(page.Items))
+	for _, item := range page.Items {
+		if item.Raw != "" {
+			out = append(out, item.Raw)
 		}
-		out = append(out, line)
 	}
-	return out
+	return out, nil
 }
 
 func (r *jobsRunner) newListCommand() *cobra.Command {
@@ -817,21 +868,14 @@ func (r *jobsRunner) newListCommand() *cobra.Command {
 	return cmd
 }
 
-func writeRunSummary(out io.Writer, body []byte) error {
-	id := gjson.GetBytes(body, "id").String()
-	name := gjson.GetBytes(body, "name").String()
-	status := gjson.GetBytes(body, "status").String()
-	created := gjson.GetBytes(body, "createTime").String()
-	runtimeID := gjson.GetBytes(body, "payload.runtime").String()
-	region := gjson.GetBytes(body, "payload.region").String()
-
+func writeRunSummary(out io.Writer, run api.RunView) error {
 	pairs := [][2]string{
-		{"ID", id},
-		{"Name", name},
-		{"Status", status},
-		{"Created", created},
-		{"Runtime", runtimeID},
-		{"Region", region},
+		{"ID", run.ID},
+		{"Name", run.Name},
+		{"Status", string(run.Status)},
+		{"Created", run.CreateTime},
+		{"Runtime", runRuntime(run)},
+		{"Region", runRegion(run)},
 	}
 	maxKeyLen := 0
 	for _, pair := range pairs {
@@ -850,9 +894,26 @@ func writeRunSummary(out io.Writer, body []byte) error {
 	return nil
 }
 
+func runRuntime(run api.RunView) string {
+	if run.Payload.Runtime == nil {
+		return ""
+	}
+	return string(*run.Payload.Runtime)
+}
+
+func runRegion(run api.RunView) string {
+	if run.KubeApp == nil {
+		return ""
+	}
+	return run.KubeApp.RegionName
+}
+
 func writeRunListTable(out io.Writer, body []byte) error {
-	items := gjson.GetBytes(body, "items")
-	if !items.IsArray() || len(items.Array()) == 0 {
+	page, err := api.ListJobRuns.Decode(body)
+	if err != nil {
+		return fmt.Errorf("decode run list: %w", err)
+	}
+	if len(page.Items) == 0 {
 		_, err := fmt.Fprintln(out, "No runs found.")
 		return err
 	}
@@ -861,14 +922,8 @@ func writeRunListTable(out io.Writer, body []byte) error {
 	if _, err := fmt.Fprintln(tw, "ID\tNAME\tSTATUS\tCREATED\tRUNTIME\tREGION"); err != nil {
 		return err
 	}
-	for _, item := range items.Array() {
-		id := item.Get("id").String()
-		name := item.Get("name").String()
-		status := item.Get("status").String()
-		created := item.Get("createTime").String()
-		runtimeID := item.Get("payload.runtime").String()
-		region := item.Get("payload.region").String()
-		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", id, name, status, created, runtimeID, region); err != nil {
+	for _, run := range page.Items {
+		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", run.ID, run.Name, run.Status, run.CreateTime, runRuntime(run), runRegion(run)); err != nil {
 			return err
 		}
 	}
@@ -912,10 +967,9 @@ func (r *jobsRunner) newMetricsCommand() *cobra.Command {
 }
 
 func writeInstantMetrics(out io.Writer, body []byte) error {
-	metrics := gjson.GetBytes(body, "instant_metrics")
-	if !metrics.Exists() || !metrics.IsObject() {
-		_, err := fmt.Fprintln(out, "No instant metrics available.")
-		return err
+	response, err := api.GetJobRunMetrics.Decode(body)
+	if err != nil {
+		return fmt.Errorf("decode run metrics: %w", err)
 	}
 
 	type metricEntry struct {
@@ -923,37 +977,34 @@ func writeInstantMetrics(out io.Writer, body []byte) error {
 		formatted   string
 	}
 
-	entries := make([]metricEntry, 0)
+	entries := make([]metricEntry, 0, len(response.InstantMetrics))
 	maxNameLen := 0
 
-	metrics.ForEach(func(_, value gjson.Result) bool {
-		displayName := value.Get("display_name").String()
-		if displayName == "" {
-			return true
+	for _, metric := range response.InstantMetrics {
+		if metric.DisplayName == "" {
+			continue
 		}
 
-		rawValue := value.Get("metric.data.value")
-		format := value.Get("metric.format").String()
-
-		var formatted string
-		if !rawValue.Exists() || rawValue.Type == gjson.Null {
-			formatted = "N/A"
-		} else {
-			formatted = formatMetricValue(rawValue.Float(), format)
+		formatted := "N/A"
+		if value := metric.Metric.Data.Value; value != nil {
+			formatted = formatMetricValue(*value, metric.Metric.Format)
 		}
 
-		if len(displayName) > maxNameLen {
-			maxNameLen = len(displayName)
+		if len(metric.DisplayName) > maxNameLen {
+			maxNameLen = len(metric.DisplayName)
 		}
-		entries = append(entries, metricEntry{displayName: displayName, formatted: formatted})
-		return true
-	})
+		entries = append(entries, metricEntry{displayName: metric.DisplayName, formatted: formatted})
+	}
 
 	if len(entries) == 0 {
 		_, err := fmt.Fprintln(out, "No instant metrics available.")
 		return err
 	}
 
+	// The response is a JSON object, so decoding loses its order.
+	slices.SortFunc(entries, func(a, b metricEntry) int {
+		return strings.Compare(a.displayName, b.displayName)
+	})
 	for _, entry := range entries {
 		padding := strings.Repeat(" ", maxNameLen-len(entry.displayName))
 		if _, err := fmt.Fprintf(out, "%s:%s  %s\n", entry.displayName, padding, entry.formatted); err != nil {
@@ -963,13 +1014,13 @@ func writeInstantMetrics(out io.Writer, body []byte) error {
 	return nil
 }
 
-func formatMetricValue(value float64, format string) string {
-	switch strings.ToUpper(format) {
-	case "PERCENTAGE":
+func formatMetricValue(value float64, format api.DataFormat) string {
+	switch format {
+	case api.DataFormatPERCENTAGE:
 		return fmt.Sprintf("%.1f%%", value)
-	case "CURRENCY":
+	case api.DataFormatCURRENCY:
 		return fmt.Sprintf("$%.2f", value)
-	case "BYTES":
+	case api.DataFormatBYTES:
 		return formatBytes(value)
 	default:
 		if value == math.Trunc(value) {
@@ -1006,25 +1057,25 @@ func (r *jobsRunner) executeList(cmd *cobra.Command, statuses []string, name, af
 		return fmt.Errorf("invalid --output %q (expected text|json)", output)
 	}
 
-	query := []executor.QueryPair{{Key: "size", Value: fmt.Sprintf("%d", limit)}}
-	if strings.TrimSpace(name) != "" {
-		query = append(query, executor.QueryPair{Key: "name", Value: name})
+	params := api.ListJobRunsParams{
+		Size:         &limit,
+		Name:         optional(name),
+		CreatedAfter: optional(after),
+		Region:       optional(region),
 	}
-	if strings.TrimSpace(after) != "" {
-		query = append(query, executor.QueryPair{Key: "created_after", Value: after})
-	}
-	if strings.TrimSpace(region) != "" {
-		query = append(query, executor.QueryPair{Key: "region", Value: region})
-	}
+	wanted := make([]api.RunStatus, 0, len(statuses))
 	for _, status := range statuses {
 		normalized := strings.ToUpper(strings.TrimSpace(status))
 		if normalized == "" {
 			continue
 		}
-		query = append(query, executor.QueryPair{Key: "status", Value: normalized})
+		wanted = append(wanted, api.RunStatus(normalized))
+	}
+	if len(wanted) > 0 {
+		params.Status = &wanted
 	}
 
-	respBody, err := r.executeOrDryRun(cmd.Context(), cmd.OutOrStdout(), r.listRuns, nil, query, "")
+	respBody, err := r.executeOrDryRun(cmd.Context(), cmd.OutOrStdout(), r.listRuns, nil, executor.QueryParams(params), "")
 	if err != nil {
 		return err
 	}
@@ -1044,53 +1095,62 @@ func (r *jobsRunner) followLogs(cmd *cobra.Command, runID string, intervalSec fl
 	watcher, stop := newInterruptWatcher()
 	defer stop()
 
-	cursor := 0
+	stream := newLogStream(cmd.ErrOrStderr())
 	for {
-		if watcher.Interrupted() {
-			return true, nil
-		}
-
-		respBody, err := r.execWithRetry(cmd.Context(), r.getRunLogs, []string{runID}, []executor.QueryPair{{Key: "cursor", Value: fmt.Sprintf("%d", cursor)}, {Key: "size", Value: "200"}}, "")
-		if err != nil {
-			return false, err
-		}
-		lines := extractLogLines(respBody)
-		for _, line := range lines {
-			if _, err := fmt.Fprintln(cmd.OutOrStdout(), line); err != nil {
-				return false, err
-			}
-		}
-
-		nextCursor := gjson.GetBytes(respBody, "next_page")
-		if nextCursor.Exists() && nextCursor.Type != gjson.Null {
-			next := int(nextCursor.Int())
-			if next != cursor {
-				cursor = next
-			}
-		} else {
-			cursor += len(lines)
+		if detached, err := r.printNewLogs(cmd, runID, stream, watcher); detached || err != nil {
+			return detached, err
 		}
 
 		runBody, err := r.execWithRetry(cmd.Context(), r.getRun, []string{runID}, nil, "")
 		if err != nil {
 			return false, err
 		}
-		status := strings.ToUpper(strings.TrimSpace(gjson.GetBytes(runBody, "status").String()))
-		if _, terminal := terminalStatuses[status]; terminal {
-			finalBody, err := r.execWithRetry(cmd.Context(), r.getRunLogs, []string{runID}, []executor.QueryPair{{Key: "cursor", Value: fmt.Sprintf("%d", cursor)}, {Key: "size", Value: "1000"}}, "")
-			if err != nil {
-				return false, err
+		run, err := api.GetJobRun.Decode(runBody)
+		if err != nil {
+			return false, fmt.Errorf("decode run: %w", err)
+		}
+		if phase := classifyRun(run.Status); phase != runPhaseActive {
+			if phase == runPhaseUnknown {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Stopped following: this CLI does not recognize run status %q. Run 'wherobots upgrade' to get a newer version.\n", run.Status)
 			}
-			for _, line := range extractLogLines(finalBody) {
-				if _, err := fmt.Fprintln(cmd.OutOrStdout(), line); err != nil {
-					return false, err
-				}
-			}
-			return false, nil
+			// Lines can land between the last read and the status check.
+			return r.printNewLogs(cmd, runID, stream, watcher)
 		}
 
 		if interrupted := sleepWithInterrupt(watcher, time.Duration(intervalSec*float64(time.Second))); interrupted {
 			return true, nil
+		}
+	}
+}
+
+// printNewLogs reads until next_page is null, which is the end of the logs so
+// far. It reports true when interrupted.
+func (r *jobsRunner) printNewLogs(cmd *cobra.Command, runID string, stream *logStream, watcher *interruptWatcher) (bool, error) {
+	for {
+		if watcher.Interrupted() {
+			return true, nil
+		}
+		cursor := strconv.FormatInt(stream.cursor, 10)
+		query := executor.QueryParams(api.GetJobRunLogsParams{Cursor: &cursor, Size: api.Ptr(logPageSize)})
+		respBody, err := r.execWithRetry(cmd.Context(), r.getRunLogs, []string{runID}, query, "")
+		if err != nil {
+			return false, err
+		}
+		page, err := api.GetJobRunLogs.DecodeStrict(respBody)
+		if err != nil {
+			return false, fmt.Errorf("decode run logs: %w", err)
+		}
+		lines, more, err := stream.next(page)
+		if err != nil {
+			return false, err
+		}
+		for _, line := range lines {
+			if _, err := fmt.Fprintln(cmd.OutOrStdout(), line); err != nil {
+				return false, err
+			}
+		}
+		if !more {
+			return false, nil
 		}
 	}
 }
@@ -1106,17 +1166,20 @@ func (r *jobsRunner) completeRuntimes(cmd *cobra.Command, _ []string, _ string) 
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
+	hint, err := api.GetNotebookConfigHint.Decode(body)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
 	var values []string
-	gjson.GetBytes(body, "runtimes.hint").ForEach(func(_, item gjson.Result) bool {
+	for _, item := range hint.Runtimes.Hint {
 		// Skip runtimes the org cannot use; be lenient when "enabled" is absent.
-		if item.Get("enabled").Exists() && !item.Get("enabled").Bool() {
-			return true
+		if item.Enabled != nil && !*item.Enabled {
+			continue
 		}
-		if v := strings.TrimSpace(item.Get("id").String()); v != "" {
+		if v := strings.TrimSpace(string(item.ID)); v != "" {
 			values = append(values, v)
 		}
-		return true
-	})
+	}
 	return values, cobra.ShellCompDirectiveNoFileComp
 }
 
@@ -1128,14 +1191,23 @@ func (r *jobsRunner) completeRegions(cmd *cobra.Command, _ []string, _ string) (
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
+	return allowedRegions(body), cobra.ShellCompDirectiveNoFileComp
+}
+
+// allowedRegions lists the organization's regions; completion treats a body it
+// cannot read as no suggestions.
+func allowedRegions(body []byte) []string {
+	org, err := api.GetMyOrganization.Decode(body)
+	if err != nil || org.AllowedRegions == nil {
+		return nil
+	}
 	var values []string
-	gjson.GetBytes(body, "allowedRegions").ForEach(func(_, item gjson.Result) bool {
-		if v := strings.TrimSpace(item.String()); v != "" {
+	for _, region := range *org.AllowedRegions {
+		if v := strings.TrimSpace(region); v != "" {
 			values = append(values, v)
 		}
-		return true
-	})
-	return values, cobra.ShellCompDirectiveNoFileComp
+	}
+	return values
 }
 
 func (r *jobsRunner) fetchForCompletion(cmd *cobra.Command, op *spec.Operation) ([]byte, error) {

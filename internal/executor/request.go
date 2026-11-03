@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 
 	"github.com/tidwall/gjson"
@@ -314,7 +315,7 @@ func buildRequest(
 		if pair.Key == "" {
 			return nil, fmt.Errorf("query key cannot be empty")
 		}
-		queryValues.Set(pair.Key, pair.Value)
+		queryValues.Add(pair.Key, pair.Value)
 		seenQuery[pair.Key] = struct{}{}
 	}
 	for required := range requiredQuery {
@@ -438,4 +439,29 @@ func refreshedReplay(req *http.Request, creds Credentials) (*http.Request, bool,
 		return nil, false, applyErr
 	}
 	return retry, true, nil
+}
+
+// QueryParams flattens a generated Params struct into query pairs using its
+// form tags. Nil pointers are left out and a slice becomes repeated keys.
+func QueryParams(params any) []QueryPair {
+	value := reflect.ValueOf(params)
+	var pairs []QueryPair
+	for i := range value.NumField() {
+		key, _, _ := strings.Cut(value.Type().Field(i).Tag.Get("form"), ",")
+		field := value.Field(i)
+		if field.Kind() == reflect.Pointer {
+			if field.IsNil() {
+				continue
+			}
+			field = field.Elem()
+		}
+		if field.Kind() != reflect.Slice {
+			pairs = append(pairs, QueryPair{Key: key, Value: fmt.Sprint(field)})
+			continue
+		}
+		for j := range field.Len() {
+			pairs = append(pairs, QueryPair{Key: key, Value: fmt.Sprint(field.Index(j))})
+		}
+	}
+	return pairs
 }

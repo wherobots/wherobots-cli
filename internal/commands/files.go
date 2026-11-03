@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/tidwall/gjson"
 
+	"wherobots/cli/internal/api"
 	"wherobots/cli/internal/config"
 	"wherobots/cli/internal/executor"
 	"wherobots/cli/internal/files"
@@ -54,15 +54,15 @@ func addFilesCommands(root *cobra.Command, cfg config.Config, creds executor.Cre
 		transfer: &http.Client{},
 		flags:    flags,
 		ops: files.Operations{
-			ListDirectory:   findOperation(runtimeSpec, "GET", "/storage/{storage_id}/directories/{path}"),
-			CreateDirectory: findOperation(runtimeSpec, "PUT", "/storage/{storage_id}/directories/{path}"),
-			DeleteDirectory: findOperation(runtimeSpec, "DELETE", "/storage/{storage_id}/directories/{path}"),
-			CreateUploadURL: findOperation(runtimeSpec, "POST", "/storage/{storage_id}/file-upload-url/{path}"),
-			DownloadFile:    findOperation(runtimeSpec, "GET", "/storage/{storage_id}/files/{path}"),
-			DeleteFile:      findOperation(runtimeSpec, "DELETE", "/storage/{storage_id}/files/{path}"),
-			RenameFile:      findOperation(runtimeSpec, "POST", "/storage/{storage_id}/file-rename/{path}"),
+			ListDirectory:   findOperation(runtimeSpec, api.ListDirectoryContents),
+			CreateDirectory: findOperation(runtimeSpec, api.CreateDirectory),
+			DeleteDirectory: findOperation(runtimeSpec, api.DeleteDirectory),
+			CreateUploadURL: findOperation(runtimeSpec, api.CreateFileUploadURL),
+			DownloadFile:    findOperation(runtimeSpec, api.DownloadFileFromStorage),
+			DeleteFile:      findOperation(runtimeSpec, api.DeleteFileFromStorage),
+			RenameFile:      findOperation(runtimeSpec, api.RenameFileInStorage),
 		},
-		getOrganization: findOperation(runtimeSpec, "GET", "/organization"),
+		getOrganization: findOperation(runtimeSpec, api.GetMyOrganization),
 	}
 	if !r.ops.Complete() {
 		return
@@ -162,7 +162,11 @@ func (r *filesRunner) resolveRegion(ctx context.Context, flagValue string) (stri
 		}
 		return "", fmt.Errorf("looking up your organization's default region: %w", err)
 	}
-	region := strings.TrimSpace(gjson.GetBytes(body, "defaultRegion").String())
+	org, err := api.GetMyOrganization.Decode(body)
+	if err != nil {
+		return "", fmt.Errorf("decode organization: %w", err)
+	}
+	region := strings.TrimSpace(org.DefaultRegion)
 	if region == "" {
 		return "", fmt.Errorf("your organization has no default region: pass --region <region>")
 	}
@@ -191,14 +195,7 @@ func (r *filesRunner) completeRegions(cmd *cobra.Command, _ []string, _ string) 
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
-	var values []string
-	gjson.GetBytes(body, "allowedRegions").ForEach(func(_, item gjson.Result) bool {
-		if v := strings.TrimSpace(item.String()); v != "" {
-			values = append(values, v)
-		}
-		return true
-	})
-	return values, cobra.ShellCompDirectiveNoFileComp
+	return allowedRegions(body), cobra.ShellCompDirectiveNoFileComp
 }
 
 // filesArgs checks the positional count and explains the expected form.
