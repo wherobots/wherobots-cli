@@ -66,6 +66,7 @@ The executor still sends every request: `api.GetJobRun.Method`/`.Path` find the 
 | `internal/files` | Wherobots Files drives and file operations used by `files` commands |
 | `internal/spec` | OpenAPI spec fetching, caching, and parsing |
 | `internal/executor` | HTTP request construction, execution, dry-run, file upload and download |
+| `internal/httpclient` | The HTTP client for anything that sends writes; it refuses a redirect that would change the method |
 | `internal/config` | Env-var-based configuration loading |
 | `internal/hints` | Schema-aware error messages for invalid arguments |
 | `internal/version` | Background update check against the GitHub releases API (the `upgrade` command is in `internal/commands/upgrade.go`) |

@@ -19,6 +19,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"wherobots/cli/internal/httpclient"
 )
 
 // Scopes requested at sign-in; offline_access yields the refresh token.
@@ -181,7 +183,8 @@ func (c *Client) PollForToken(ctx context.Context, da *DeviceAuthorization) (*To
 		tokens, oauthErr, err := c.tokenGrant(ctx, endpoints.Token, form)
 		if err != nil {
 			failures++
-			if ctx.Err() != nil || failures >= maxConsecutivePollFailures {
+			var refused *httpclient.RefusedRedirectError
+			if ctx.Err() != nil || failures >= maxConsecutivePollFailures || errors.As(err, &refused) {
 				return nil, fmt.Errorf("poll for sign-in: %w", err)
 			}
 		} else if oauthErr == nil {

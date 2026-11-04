@@ -12,6 +12,14 @@ import (
 	"testing"
 )
 
+var errNetworkDown = errors.New("network down")
+
+type failingTransport struct{}
+
+func (failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errNetworkDown
+}
+
 // storageRecorder is a mock presigned-storage server that records the
 // headers of every request it receives.
 type storageRecorder struct {
@@ -217,6 +225,22 @@ func TestStreamFromURLReportsStorageError(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "Access Denied for") || strings.Contains(err.Error(), "org-42") {
 		t.Fatalf("err = %v, must not include the storage body's message", err)
+	}
+}
+
+func TestStreamFromURLOmitsSignedURLFromNetworkError(t *testing.T) {
+	t.Parallel()
+
+	client := &http.Client{Transport: failingTransport{}}
+	_, err := StreamFromURL(context.Background(), client, "https://storage.test/obj?X-Amz-Signature=secret", &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "download request failed") {
+		t.Fatalf("err = %v, want a download failure", err)
+	}
+	if strings.Contains(err.Error(), "X-Amz-Signature") {
+		t.Fatalf("err = %v, must not include the signed URL", err)
+	}
+	if !errors.Is(err, errNetworkDown) {
+		t.Fatalf("err = %v, want the cause kept", err)
 	}
 }
 

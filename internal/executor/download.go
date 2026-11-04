@@ -113,6 +113,15 @@ func redirectLocation(client *http.Client, req *http.Request) (string, error) {
 	return "", fmt.Errorf("expected a redirect to the file's storage location, got HTTP %d", resp.StatusCode)
 }
 
+// withoutURL drops the url.Error wrapper, whose message names a URL that can be presigned.
+func withoutURL(err error) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return urlErr.Err
+	}
+	return err
+}
+
 // StreamFromURL fetches rawURL with a fresh GET that carries no auth or
 // client headers (the URL is presigned) and copies the body to w verbatim.
 func StreamFromURL(ctx context.Context, client *http.Client, rawURL string, w io.Writer) (int64, error) {
@@ -133,7 +142,7 @@ func StreamFromURL(ctx context.Context, client *http.Client, rawURL string, w io
 	req.Header.Set("Accept-Encoding", "identity")
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("download request failed: %w", err)
+		return 0, fmt.Errorf("download request failed: %w", withoutURL(err))
 	}
 	defer resp.Body.Close()
 

@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -56,5 +57,26 @@ func TestUploadFileToPresignedURLServerError(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "org-42") {
 		t.Fatalf("error must not include the storage body's message: %v", err)
+	}
+}
+
+func TestUploadFileToPresignedURLOmitsSignedURLFromNetworkError(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "script.py")
+	if err := os.WriteFile(path, []byte("print('hi')\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	client := &http.Client{Transport: failingTransport{}}
+	err := UploadFileToPresignedURL(context.Background(), client, "https://storage.test/obj?X-Amz-Signature=secret", path)
+	if err == nil || !strings.Contains(err.Error(), "upload request failed") {
+		t.Fatalf("err = %v, want an upload failure", err)
+	}
+	if strings.Contains(err.Error(), "X-Amz-Signature") {
+		t.Fatalf("err = %v, must not include the signed URL", err)
+	}
+	if !errors.Is(err, errNetworkDown) {
+		t.Fatalf("err = %v, want the cause kept", err)
 	}
 }

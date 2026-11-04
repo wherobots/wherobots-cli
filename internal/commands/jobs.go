@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -23,6 +24,7 @@ import (
 	"wherobots/cli/internal/api"
 	"wherobots/cli/internal/config"
 	"wherobots/cli/internal/executor"
+	"wherobots/cli/internal/httpclient"
 	"wherobots/cli/internal/spec"
 )
 
@@ -1276,6 +1278,10 @@ func (r *jobsRunner) execWithRetry(ctx context.Context, op *spec.Operation, path
 }
 
 func isRetryable(err error) bool {
+	var refused *httpclient.RefusedRedirectError
+	if errors.As(err, &refused) {
+		return false
+	}
 	httpErr, ok := err.(*executor.HTTPError)
 	if !ok {
 		return true

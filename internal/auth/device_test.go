@@ -9,8 +9,12 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"wherobots/cli/internal/config"
+	"wherobots/cli/internal/httpclient"
 )
 
 // mockAuthKit serves OIDC discovery plus scripted device-authorization and
@@ -280,6 +284,31 @@ func TestPollForTokenGivesUpAfterConsecutiveFailures(t *testing.T) {
 	}
 }
 
+func TestPollForTokenStopsOnRefusedRedirect(t *testing.T) {
+	t.Parallel()
+	var tokenCalls atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth2/token", func(w http.ResponseWriter, r *http.Request) {
+		tokenCalls.Add(1)
+		http.Redirect(w, r, "/target", http.StatusFound)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	client := NewResolver(config.Config{OAuthDomain: srv.URL, HTTPTimeout: time.Second}).OAuthClient()
+	client.sleep = func(ctx context.Context, _ time.Duration) error { return ctx.Err() }
+
+	_, err := client.PollForToken(context.Background(), &DeviceAuthorization{DeviceCode: "d", Interval: 5, ExpiresIn: 299})
+
+	var refused *httpclient.RefusedRedirectError
+	if !errors.As(err, &refused) {
+		t.Fatalf("PollForToken() error = %v, want a refused redirect", err)
+	}
+	if got := tokenCalls.Load(); got != 1 {
+		t.Errorf("token calls = %d, want 1", got)
+	}
+}
+
 func TestRefreshRotatesToken(t *testing.T) {
 	t.Parallel()
 	m := newMockAuthKit(t, []mockResponse{
@@ -374,5 +403,33 @@ func TestExpiresAtFallsBackToJWTExp(t *testing.T) {
 	}
 	if tokens.ExpiresAt.Unix() != exp {
 		t.Errorf("ExpiresAt = %v, want JWT exp %v", tokens.ExpiresAt.Unix(), exp)
+	}
+}
+
+func TestRefreshRefusesRedirect(t *testing.T) {
+	t.Parallel()
+	var targetHits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/target" {
+			targetHits.Add(1)
+			writeJSON(w, http.StatusOK, map[string]any{"access_token": "access-2", "expires_in": 3600})
+			return
+		}
+		http.Redirect(w, r, "/target", http.StatusFound)
+	}))
+	defer srv.Close()
+
+	client := NewResolver(config.Config{OAuthDomain: srv.URL, HTTPTimeout: time.Second}).OAuthClient()
+	tokens, err := client.Refresh(context.Background(), srv.URL+"/oauth2/token", "client", "refresh-1")
+
+	if err == nil {
+		t.Fatalf("Refresh() succeeded with %+v", tokens)
+	}
+	var refused *httpclient.RefusedRedirectError
+	if !errors.As(err, &refused) || refused.StatusCode != http.StatusFound {
+		t.Fatalf("Refresh() error = %v, want a refused 302", err)
+	}
+	if got := targetHits.Load(); got != 0 {
+		t.Fatalf("redirect target was hit %d times", got)
 	}
 }
